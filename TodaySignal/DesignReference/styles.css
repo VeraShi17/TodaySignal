@@ -1,0 +1,42 @@
+/* 오늘의 시그널 — palette + base */
+:root {
+  /* Backgrounds */
+  --bg-page: #FAF4EE;          /* warm cream */
+  --bg-card: #FFFFFF;
+  --bg-elev: #FFF8F3;
+  --bg-soft: #FDEEF1;          /* very soft pink wash */
+  --bg-mint: #E8F6EE;
+  --bg-lavender: #EFEAFA;
+
+  /* Brand accents */
+  --pink: #F58CA0;             /* primary CTA */
+  --pink-deep: #E97089;
+  --pink-soft: #FFD8E1;
+  --pink-tint: #FCEAEF;
+  --coral: #FFA08A;
+  --lavender: #B8A5E0;
+  --lavender-soft: #E0D6F5;
+  --mint: #6FCFA8;
+  --mint-soft: #C9EBD9;
+  --amber: #F2B86A;
+
+  /* Text */
+  --ink: #2D2330;
+  --ink-2: #4E3F4A;
+  --ink-mute: #8A7B85;
+  --ink-faint: #B8AAB2;
+
+  /* Strokes */
+  --line: #F0E6E0;
+  --line-2: #EADDD3;
+
+  /* Font */
+  --f-sans: -apple-system, "SF Pro Display", "SF Pro Text", "Pretendard", "Apple SD Gothic Neo", system-ui, sans-serif;
+  --f-display: "DM Serif Display", "Noto Serif KR", Georgia, serif;
+}
+
+html, body { margin: 0; padding: 0; font-family: var(--f-sans); color: var(--ink); }
+
+/* utility */
+.k { font-feature-settings: "ss01"; }
+.ko { font-family: "Apple SD Gothic Neo", "Noto Sans KR", -apple-system, system-ui, sans-serif; }
