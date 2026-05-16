@@ -40,11 +40,13 @@ struct TextConfirmationView: View {
                             ChatBubbleView(
                                 bubble: bubble,
                                 idolSide: appState.idolSide,
-                                showEditControls: true,
+                                showEditControls: !appState.isAnalyzing,
                                 onEdit: {
+                                    guard !appState.isAnalyzing else { return }
                                     beginEditing(bubble: bubble)
                                 },
                                 onDelete: {
+                                    guard !appState.isAnalyzing else { return }
                                     withAnimation {
                                         appState.chatBubbles.removeAll { $0.id == bubble.id }
                                     }
@@ -94,7 +96,10 @@ struct TextConfirmationView: View {
                     HStack(spacing: 0) {
                         ForEach([BubbleSide.left, .right], id: \.self) { side in
                             let isSelected = side == appState.idolSide
-                            Button(action: { withAnimation(.easeInOut(duration: 0.2)) { appState.idolSide = side } }) {
+                            Button(action: {
+                                guard !appState.isAnalyzing else { return }
+                                withAnimation(.easeInOut(duration: 0.2)) { appState.idolSide = side }
+                            }) {
                                 HStack(spacing: 6) {
                                     Text(side == .left ? "← 左侧" : "右侧 →")
                                         .font(.system(size: 14, weight: .semibold))
@@ -117,11 +122,49 @@ struct TextConfirmationView: View {
                     .background(Color(hex: "F2EAEC"))
                     .clipShape(RoundedRectangle(cornerRadius: 14))
 
+                    if appState.isAnalyzing {
+                        HStack(spacing: 10) {
+                            ProgressView()
+                            Text("正在解析聊天内容…")
+                                .font(.system(size: 13.5, weight: .medium))
+                                .foregroundStyle(Color.ink2)
+                        }
+                        .padding(.horizontal, 12)
+                        .padding(.vertical, 10)
+                        .background(Color.bgSoft)
+                        .clipShape(RoundedRectangle(cornerRadius: 12))
+                    }
+
+                    if let errorMessage = appState.analysisErrorMessage {
+                        HStack(alignment: .top, spacing: 8) {
+                            Image(systemName: "exclamationmark.triangle.fill")
+                                .foregroundStyle(Color(hex: "D96A1D"))
+                                .padding(.top, 1)
+                            Text(errorMessage)
+                                .font(.system(size: 12.5))
+                                .foregroundStyle(Color.ink2)
+                                .lineSpacing(3)
+                        }
+                        .padding(.horizontal, 12)
+                        .padding(.vertical, 10)
+                        .background(Color(hex: "FFF4EA"))
+                        .clipShape(RoundedRectangle(cornerRadius: 12))
+                    }
+
                     // Action buttons
                     HStack(spacing: 10) {
-                        PrimaryButton(title: "开始解析", icon: "sparkle", action: onAnalyze)
+                        PrimaryButton(
+                            title: appState.isAnalyzing ? "解析中…" : "开始解析",
+                            icon: "sparkle",
+                            isDisabled: appState.isAnalyzing || appState.chatBubbles.isEmpty,
+                            action: {
+                                appState.clearAnalysisError()
+                                onAnalyze()
+                            }
+                        )
 
                         SecondaryButton(title: "重新上传", isFullWidth: false, action: onBack)
+                            .disabled(appState.isAnalyzing)
                     }
                 }
                 .padding(.horizontal, 22)

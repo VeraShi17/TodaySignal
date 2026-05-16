@@ -17,6 +17,14 @@ class AppState {
     // MARK: - Analysis Results
 
     var analysisResults: [AnalysisResult] = []
+    var isAnalyzing = false
+    var analysisErrorMessage: String?
+
+    private let aiAnalysisService: AIAnalysisServicing
+
+    init(aiAnalysisService: AIAnalysisServicing = AIAnalysisServiceFactory.makeDefaultService()) {
+        self.aiAnalysisService = aiAnalysisService
+    }
 
     // MARK: - Card Library (accumulated across sessions)
 
@@ -42,10 +50,35 @@ class AppState {
 
     // MARK: - Actions
 
-    /// Start a new analysis session with mock data
-    func startAnalysis() {
-        analysisResults = MockData.analysisResults
-        navigationPath.append(AnalysisRoute.analysisResult)
+    @MainActor
+    func startAnalysis() async {
+        guard !isAnalyzing else { return }
+
+        isAnalyzing = true
+        analysisErrorMessage = nil
+
+        defer { isAnalyzing = false }
+
+        do {
+            let request = AnalysisRequest(bubbles: chatBubbles, idolSide: idolSide)
+            let results = try await aiAnalysisService.analyze(request: request)
+            analysisResults = results
+            navigationPath.append(AnalysisRoute.analysisResult)
+        } catch {
+            if let knownError = error as? AIAnalysisError {
+                if let debugMessage = knownError.debugMessage {
+                    analysisErrorMessage = "\(knownError.errorDescription ?? "解析失败")\n\n调试信息：\(debugMessage)"
+                } else {
+                    analysisErrorMessage = knownError.errorDescription
+                }
+            } else {
+                analysisErrorMessage = "解析失败，请稍后重试。"
+            }
+        }
+    }
+
+    func clearAnalysisError() {
+        analysisErrorMessage = nil
     }
 
     /// Update a knowledge point's action state
@@ -112,6 +145,8 @@ class AppState {
         chatBubbles = MockData.chatBubbles
         idolSide = .left
         analysisResults = []
+        analysisErrorMessage = nil
+        isAnalyzing = false
         navigationPath = NavigationPath()
         selectedTab = .analysis
     }

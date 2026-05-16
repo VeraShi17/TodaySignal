@@ -668,12 +668,12 @@ MVP should not save:
 
 | Order | Task | Status |
 |---:|---|---|
-| 23 | Create AIAnalysisService | 未开始 |
-| 24 | Write structured prompt | 未开始 |
-| 25 | Define JSON schema | 未开始 |
-| 26 | Connect real LLM API | 未开始 |
-| 27 | Validate JSON output | 未开始 |
-| 28 | Implement timeout and partial failure handling | 未开始 |
+| 23 | Create AIAnalysisService | ✅ 已完成（基础版） |
+| 24 | Write structured prompt | ✅ 已完成（基础版） |
+| 25 | Define JSON schema | ✅ 已完成（基础版） |
+| 26 | Connect real LLM API | ✅ 已完成（OpenAI 可切换） |
+| 27 | Validate JSON output | ✅ 已完成（解码校验） |
+| 28 | Implement timeout and partial failure handling | 🔄 进行中（已接入 timeout 与基础错误态） |
 
 ### Phase 5 — Persistence
 
@@ -715,13 +715,13 @@ MVP should not save:
 
 | Item | Notes |
 |---|---|
-| (None) | Phase 2 complete; ready for Phase 3 |
+| Phase 4 — AI Analysis Integration | AIAnalysisService 基础接入完成，正在补 prompt/schema/真实 API |
 
 ### 7.3 Not Started
 
 | Item |
 |---|
-| AI analysis integration (Phase 4) |
+| AI analysis integration (Phase 4)（进行中） |
 | Local persistence (Phase 5) |
 | MVP QA testing (Phase 6) |
 
@@ -891,6 +891,35 @@ MVP should not save:
 1. Define `AIAnalysisService` input/output schema based on confirmed bubbles.
 2. Implement prompt + strict JSON validation with fixed tone labels.
 3. Replace `AppState.startAnalysis()` mock path with async service call and add timeout/partial-failure UI.
+
+### 2026-05-16 — Phase 4 AI Analysis Integration (Foundation)
+
+#### Created Files
+
+- `Services/AIAnalysisService.swift` — Added analysis service protocol, mock and OpenAI implementations, structured prompt + JSON schema, response decoding and validation, timeout/error mapping, and runtime config toggle.
+
+#### Modified Files
+
+- `Models/AppState.swift` — Added async analysis pipeline, loading state, and analysis error state; now calls `AIAnalysisService` instead of directly using mock results.
+- `Views/MainTabView.swift` — Updated `onAnalyze` path to call async `AppState.startAnalysis()`.
+- `Views/TextConfirmationView.swift` — Added analyzing/loading UI, retry-friendly error banner, and disabled interactions during analysis.
+- `Docs/development-progress.md` — Updated Phase 4 status and in-progress notes.
+
+#### What Was Implemented
+
+- Introduced a pluggable analysis service layer (`AIAnalysisServicing`) for Phase 4.
+- Added OpenAI-backed analysis service (`/v1/chat/completions`) with structured output schema and strict JSON decoding.
+- Added runtime switch between mock and real OpenAI service via environment/config.
+- Switched analysis trigger from sync mock assignment to async service call.
+- Added user-visible loading and error state in text confirmation flow.
+- Preserved existing Phase 1/2/3 UI structure and navigation behavior.
+
+#### Remaining for Phase 4
+
+- Per-bubble partial failure rendering (currently request-level fallback only).
+- Production-safe key management migration (move API call from client to backend proxy before release).
+- Timeout strategy UX refinement with explicit 30s/60s progress messaging.
+- Real-user eval and prompt tuning on noisy OCR text samples.
 
 ---
 

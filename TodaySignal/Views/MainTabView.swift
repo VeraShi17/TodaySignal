@@ -65,7 +65,9 @@ struct MainTabView: View {
                     case .textConfirmation:
                         TextConfirmationView(
                             onAnalyze: {
-                                appState.startAnalysis()
+                                Task {
+                                    await appState.startAnalysis()
+                                }
                             },
                             onBack: {
                                 appState.navigationPath.removeLast()
