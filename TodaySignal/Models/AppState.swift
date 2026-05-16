@@ -7,7 +7,11 @@ class AppState {
 
     // MARK: - Onboarding
 
-    var hasCompletedOnboarding = false
+    var hasCompletedOnboarding: Bool {
+        didSet {
+            UserDefaults.standard.set(hasCompletedOnboarding, forKey: onboardingKey)
+        }
+    }
 
     // MARK: - Text Confirmation (input stage)
 
@@ -21,9 +25,22 @@ class AppState {
     var analysisErrorMessage: String?
 
     private let aiAnalysisService: AIAnalysisServicing
+    private let cardStorageService: CardStorageService
+    private var persistedKnowledgeMarks: [String: KnowledgeAction]
 
-    init(aiAnalysisService: AIAnalysisServicing = AIAnalysisServiceFactory.makeDefaultService()) {
+    private let onboardingKey = "today_signal_onboarding_completed"
+
+    init(
+        aiAnalysisService: AIAnalysisServicing = AIAnalysisServiceFactory.makeDefaultService(),
+        cardStorageService: CardStorageService = .shared
+    ) {
         self.aiAnalysisService = aiAnalysisService
+        self.cardStorageService = cardStorageService
+        self.persistedKnowledgeMarks = cardStorageService.loadKnowledgeMarks()
+
+        self.hasCompletedOnboarding = UserDefaults.standard.bool(forKey: onboardingKey)
+        self.vocabularyCards = cardStorageService.loadVocabularyCards()
+        self.grammarCards = cardStorageService.loadGrammarCards()
     }
 
     // MARK: - Card Library (accumulated across sessions)
@@ -62,7 +79,7 @@ class AppState {
         do {
             let request = AnalysisRequest(bubbles: chatBubbles, idolSide: idolSide)
             let results = try await aiAnalysisService.analyze(request: request)
-            analysisResults = results
+            analysisResults = applyPersistedKnowledgeMarks(to: results)
             return true
         } catch {
             if let knownError = error as? AIAnalysisError {
@@ -91,10 +108,13 @@ class AppState {
             let previousAction = analysisResults[resultIndex].vocabulary[vi].action
             analysisResults[resultIndex].vocabulary[vi].action = action
 
+            let point = analysisResults[resultIndex].vocabulary[vi]
+            persistKnowledgeMark(for: point, action: action)
+
             if action == .saved {
-                let point = analysisResults[resultIndex].vocabulary[vi]
                 let card = createVocabularyCard(from: point, sentence: analysisResults[resultIndex].originalText)
                 vocabularyCards.insert(card, at: 0)
+                persistCards()
                 previewVocabCard = card
                 previewGrammarCard = nil
                 showCardPreview = true
@@ -110,10 +130,13 @@ class AppState {
             let previousAction = analysisResults[resultIndex].grammarPoints[gi].action
             analysisResults[resultIndex].grammarPoints[gi].action = action
 
+            let point = analysisResults[resultIndex].grammarPoints[gi]
+            persistKnowledgeMark(for: point, action: action)
+
             if action == .saved {
-                let point = analysisResults[resultIndex].grammarPoints[gi]
                 let card = createGrammarCard(from: point, sentence: analysisResults[resultIndex].originalText)
                 grammarCards.insert(card, at: 0)
+                persistCards()
                 previewGrammarCard = card
                 previewVocabCard = nil
                 showCardPreview = true
@@ -134,11 +157,13 @@ class AppState {
     /// Delete a vocabulary card
     func deleteVocabCard(_ cardId: UUID) {
         vocabularyCards.removeAll { $0.id == cardId }
+        persistCards()
     }
 
     /// Delete a grammar card
     func deleteGrammarCard(_ cardId: UUID) {
         grammarCards.removeAll { $0.id == cardId }
+        persistCards()
     }
 
     /// Reset analysis state for a new session
@@ -201,11 +226,53 @@ class AppState {
     /// Remove a vocabulary card that was generated from a specific knowledge point
     private func removeVocabCardForPoint(_ pointId: UUID) {
         vocabularyCards.removeAll { $0.sourcePointId == pointId }
+        persistCards()
     }
 
     /// Remove a grammar card that was generated from a specific knowledge point
     private func removeGrammarCardForPoint(_ pointId: UUID) {
         grammarCards.removeAll { $0.sourcePointId == pointId }
+        persistCards()
+    }
+
+    private func persistCards() {
+        cardStorageService.replaceAll(vocabularyCards: vocabularyCards, grammarCards: grammarCards)
+    }
+
+    private func persistKnowledgeMark(for point: KnowledgePoint, action: KnowledgeAction) {
+        let key = knowledgeMarkKey(for: point)
+        persistedKnowledgeMarks[key] = action
+        cardStorageService.saveKnowledgeMark(key: key, action: action)
+    }
+
+    private func applyPersistedKnowledgeMarks(to results: [AnalysisResult]) -> [AnalysisResult] {
+        results.map { result in
+            var updated = result
+
+            updated.vocabulary = result.vocabulary.map { point in
+                var p = point
+                let key = knowledgeMarkKey(for: p)
+                if let persistedAction = persistedKnowledgeMarks[key], persistedAction != .saved {
+                    p.action = persistedAction
+                }
+                return p
+            }
+
+            updated.grammarPoints = result.grammarPoints.map { point in
+                var p = point
+                let key = knowledgeMarkKey(for: p)
+                if let persistedAction = persistedKnowledgeMarks[key], persistedAction != .saved {
+                    p.action = persistedAction
+                }
+                return p
+            }
+
+            return updated
+        }
+    }
+
+    private func knowledgeMarkKey(for point: KnowledgePoint) -> String {
+        "\(point.type.rawValue)|\(point.term.trimmingCharacters(in: .whitespacesAndNewlines).lowercased())"
     }
 }
 

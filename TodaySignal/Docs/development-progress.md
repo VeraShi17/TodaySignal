@@ -679,11 +679,11 @@ MVP should not save:
 
 | Order | Task | Status |
 |---:|---|---|
-| 29 | Choose local storage technology | 未开始 |
-| 30 | Persist vocabulary cards | 未开始 |
-| 31 | Persist grammar cards | 未开始 |
-| 32 | Persist known / skipped knowledge marks | 未开始 |
-| 33 | Load saved cards on app launch | 未开始 |
+| 29 | Choose local storage technology | ✅ 已完成（SwiftData） |
+| 30 | Persist vocabulary cards | ✅ 已完成 |
+| 31 | Persist grammar cards | ✅ 已完成 |
+| 32 | Persist known / skipped knowledge marks | ✅ 已完成 |
+| 33 | Load saved cards on app launch | ✅ 已完成 |
 
 ### Phase 6 — MVP Polish
 
@@ -722,7 +722,7 @@ MVP should not save:
 | Item |
 |---|
 | AI analysis integration (Phase 4)（进行中） |
-| Local persistence (Phase 5) |
+| Local persistence (Phase 5)（进行中） |
 | MVP QA testing (Phase 6) |
 
 ---
@@ -920,6 +920,47 @@ MVP should not save:
 - Production-safe key management migration (move API call from client to backend proxy before release).
 - Timeout strategy UX refinement with explicit 30s/60s progress messaging.
 - Real-user eval and prompt tuning on noisy OCR text samples.
+
+### 2026-05-16 — Phase 5 Local Persistence (Part 1)
+
+#### Created Files
+
+- `Services/CardStorageService.swift` — Added SwiftData-backed local storage service and persisted model schema for vocabulary/grammar cards.
+
+#### Modified Files
+
+- `Models/AppState.swift` — AppState now loads cards from local storage on init and persists card add/delete/undo operations.
+- `Docs/development-progress.md` — Updated Phase 5 status and persistence progress.
+
+#### What Was Implemented
+
+- Selected SwiftData for MVP local persistence.
+- Vocabulary cards and grammar cards are now persisted locally.
+- Card library data is loaded on app launch.
+- Existing UI and interaction flow remain unchanged.
+
+#### Remaining for Phase 5
+
+- Add lightweight migration handling for future schema changes.
+- Evaluate whether `idolSide` default preference should persist between sessions.
+
+### 2026-05-16 — Phase 5 Local Persistence (Part 2)
+
+#### Modified Files
+
+- `Services/CardStorageService.swift` — Added persisted knowledge-mark model and read/write APIs for known/dismissed actions.
+- `Models/AppState.swift` — Added onboarding persistence (`UserDefaults`) and applied persisted knowledge marks to new analysis results.
+- `Docs/development-progress.md` — Updated Phase 5 completion status.
+
+#### What Was Implemented
+
+- `known / dismissed` knowledge-point marks now persist locally.
+- Persisted marks are re-applied to freshly generated analysis results.
+- Onboarding completion now persists across app relaunches.
+
+#### Remaining Notes
+
+- Current knowledge-mark key uses `type + term` (MVP-level heuristic); future versions may add stronger normalization.
 
 ---
 
