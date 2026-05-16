@@ -648,11 +648,11 @@ MVP should not save:
 
 | Order | Task | Status |
 |---:|---|---|
-| 13 | Make knowledge-point actions interactive | 未开始 |
-| 14 | Show card preview when generating card | 未开始 |
-| 15 | Add generated mock card to in-memory card library | 未开始 |
-| 16 | Delete card from in-memory state | 未开始 |
-| 17 | Preserve selected other-person side during flow | 未开始 |
+| 13 | Make knowledge-point actions interactive | ✅ 已完成 |
+| 14 | Show card preview when generating card | ✅ 已完成 |
+| 15 | Add generated mock card to in-memory card library | ✅ 已完成 |
+| 16 | Delete card from in-memory state | ✅ 已完成 |
+| 17 | Preserve selected other-person side during flow | ✅ 已完成 |
 
 ### Phase 3 — OCR
 
@@ -708,12 +708,13 @@ MVP should not save:
 | `design.md` created | Design instructions for Claude / design agent |
 | Design prototype uploaded | `Today's Signal.html` uploaded as design reference |
 | **Phase 1: Static SwiftUI Prototype** | All static UI screens, navigation, mock data, and reusable components implemented |
+| **Phase 2: Local Interactions** | Shared AppState, card generation → library flow, idol side preserved, card preview shows actual card |
 
 ### 7.2 In Progress
 
 | Item | Notes |
 |---|---|
-| Phase 2: Local Interactions | Knowledge point actions are interactive; card preview shows; next: wire in-memory card library |
+| (None) | Phase 2 complete; ready for Phase 3 |
 
 ### 7.3 Not Started
 
@@ -798,8 +799,65 @@ MVP should not save:
 #### Known Issues
 
 - Onboarding state is in-memory only; app will show onboarding again on every launch until persistence is added.
-- Card library uses its own local state; generating a card from analysis does not yet add it to the library.
+- ~~Card library uses its own local state; generating a card from analysis does not yet add it to the library.~~ (Fixed in Phase 2)
 - "粘贴韩语文本" button navigates to TextConfirmation with mock data; real text input UI not yet implemented.
+
+### 2026-05-16 — Phase 2 Implementation Complete
+
+#### Created Files
+
+**Models:**
+- `Models/AppState.swift` — Shared `@Observable` state manager that connects all views. Contains:
+  - Chat bubbles and idol side selection (persisted across TextConfirmation → Analysis flow)
+  - Analysis results with knowledge point action management
+  - Card library (vocabulary + grammar cards) shared across tabs
+  - Card generation logic (KnowledgePoint → VocabularyCard / GrammarCard)
+  - Card preview state (shows actual generated card)
+  - Navigation state (tab selection + NavigationPath)
+  - Undo support (reverting a "saved" action removes the generated card)
+
+#### Modified Files
+
+- `Models/MockData.swift` — Added `sourcePointId: UUID?` to VocabularyCard and GrammarCard to track which knowledge point generated which card (enables undo)
+- `ContentView.swift` — Creates `@State AppState` and injects via `.environment()` instead of local onboarding state
+- `Views/MainTabView.swift` — Uses `@Environment(AppState.self)` for tab selection, navigation path, and routes; removed local `Tab` and `AnalysisRoute` enums (moved to AppState.swift)
+- `Views/TextConfirmationView.swift` — Uses AppState for `chatBubbles` and `idolSide` instead of local `@State`; side selection now persists through the flow
+- `Views/AnalysisResultView.swift` — Uses AppState for `analysisResults`, `savedCount`, `knownCount`; card generation triggers `AppState.updateKnowledgeAction()` which creates cards and shows preview; `AnalysisBubbleCardView` now receives `idolSide` from AppState
+- `Views/CardPreviewModal.swift` — Now accepts `vocabCard: VocabularyCard?` and `grammarCard: GrammarCard?` to show the actual generated card instead of always `MockData.vocabularyCards[0]`; added `onGoToLibrary` callback
+- `Views/CardLibraryView.swift` — Uses `@Environment(AppState.self)` instead of local `@State` arrays; delete calls `appState.deleteVocabCard/deleteGrammarCard`; empty state CTA switches to analysis tab
+
+#### What Was Implemented
+
+- **Shared state management:** `AppState` (@Observable) injected via SwiftUI environment, shared across all views
+- **Card generation flow:** Tapping "生成卡片" on a knowledge point creates a real VocabularyCard or GrammarCard from the point's data and inserts it into the shared card library
+- **Card preview shows actual card:** The CardPreviewModal now displays the exact card that was just generated, not a hardcoded mock card
+- **Card library integration:** Cards generated in AnalysisResultView immediately appear in CardLibraryView
+- **Card deletion:** Deleting a card in the library removes it from AppState; deleting from analysis (undo) also removes the generated card
+- **Idol side preserved:** The `idolSide` selection in TextConfirmationView is stored in AppState and used by AnalysisBubbleCardView
+- **Navigation wiring:** "查看卡片库" button navigates to library tab; CardPreviewModal "查看卡片库" also navigates correctly
+- **Undo support:** Reverting a "saved" knowledge point back to "open" removes the corresponding card from the library (tracked via `sourcePointId`)
+- **Empty state CTA:** Card library empty state "上传聊天截图" button switches to analysis tab
+
+#### What Is NOT Implemented Yet
+
+- Real OCR (Apple Vision framework)
+- Real image upload / photo picker
+- Real LLM API calls
+- Persistent storage (SwiftData / CoreData)
+- Loading / error states for analysis
+- User login / account / cloud sync
+
+#### Next Recommended Tasks
+
+1. **Phase 3 — OCR Integration:** Add photo picker, integrate Apple Vision OCR, map OCR output to editable chat bubbles.
+2. **Phase 4 — AI Analysis:** Design structured prompt, connect to LLM API, validate JSON output.
+3. **Phase 5 — Persistence:** Choose SwiftData or local JSON, persist cards and knowledge marks.
+
+#### Known Issues
+
+- All state is in-memory; app resets on launch (persistence is Phase 5).
+- Cards generated from knowledge points use placeholder example sentences ("예문이 곧 생성됩니다.") since real AI generation is not yet implemented.
+- Onboarding shows on every launch until persistence is added.
 
 ---
 

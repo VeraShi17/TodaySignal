@@ -5,6 +5,7 @@ struct KnowledgePointView: View {
     var onKnow: (() -> Void)?
     var onSkip: (() -> Void)?
     var onSave: (() -> Void)?
+    var onUndo: (() -> Void)?
 
     private var isVocab: Bool { point.type == .vocabulary }
     private var accentBg: Color { isVocab ? Color(hex: "F4EEFC") : Color(hex: "FFEEE6") }
@@ -90,7 +91,7 @@ struct KnowledgePointView: View {
                     .font(.system(size: 13, weight: .semibold))
                     .foregroundStyle(Color.mint)
                 Spacer()
-                Button(action: { onSkip?() }) {
+                Button(action: { onUndo?() }) {
                     Text("撤销")
                         .font(.system(size: 13, weight: .medium))
                         .foregroundStyle(Color.inkMute)
@@ -114,6 +115,11 @@ struct KnowledgePointView: View {
                     .font(.system(size: 13, weight: .semibold))
                     .foregroundStyle(Color.inkMute)
                 Spacer()
+                Button(action: { onUndo?() }) {
+                    Text("撤销")
+                        .font(.system(size: 13, weight: .medium))
+                        .foregroundStyle(Color.inkMute)
+                }
                 Button(action: { onSave?() }) {
                     Text("生成卡片")
                         .font(.system(size: 12, weight: .semibold))

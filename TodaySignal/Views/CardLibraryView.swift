@@ -1,10 +1,9 @@
 import SwiftUI
 
 struct CardLibraryView: View {
+    @Environment(AppState.self) private var appState
     @State private var selectedTab: CardTab = .vocabulary
     @State private var expandedCardId: UUID?
-    @State private var vocabCards: [VocabularyCard] = MockData.vocabularyCards
-    @State private var grammarCards: [GrammarCard] = MockData.grammarCards
 
     enum CardTab: String, CaseIterable {
         case vocabulary = "生词"
@@ -22,7 +21,7 @@ struct CardLibraryView: View {
                         .font(.system(size: 28, weight: .bold))
                         .foregroundStyle(Color.ink)
                     Spacer()
-                    Text("本机 · \(vocabCards.count + grammarCards.count) 张")
+                    Text("本机 · \(appState.totalCardCount) 张")
                         .font(.system(size: 12))
                         .foregroundStyle(Color.inkMute)
                 }
@@ -34,7 +33,7 @@ struct CardLibraryView: View {
                 HStack(spacing: 4) {
                     ForEach(CardTab.allCases, id: \.self) { tab in
                         let isSelected = tab == selectedTab
-                        let count = tab == .vocabulary ? vocabCards.count : grammarCards.count
+                        let count = tab == .vocabulary ? appState.vocabularyCards.count : appState.grammarCards.count
                         Button(action: { withAnimation(.easeInOut(duration: 0.2)) { selectedTab = tab } }) {
                             HStack(spacing: 6) {
                                 Text(tab.rawValue)
@@ -64,13 +63,13 @@ struct CardLibraryView: View {
                 .padding(.bottom, 4)
 
                 // Content
-                if selectedTab == .vocabulary && vocabCards.isEmpty || selectedTab == .grammar && grammarCards.isEmpty {
+                if selectedTab == .vocabulary && appState.vocabularyCards.isEmpty || selectedTab == .grammar && appState.grammarCards.isEmpty {
                     emptyState
                 } else {
                     ScrollView {
                         LazyVStack(spacing: 10) {
                             if selectedTab == .vocabulary {
-                                ForEach(vocabCards) { card in
+                                ForEach(appState.vocabularyCards) { card in
                                     VocabCardRow(
                                         card: card,
                                         isExpanded: expandedCardId == card.id,
@@ -81,18 +80,18 @@ struct CardLibraryView: View {
                                         },
                                         onDelete: {
                                             withAnimation {
-                                                vocabCards.removeAll { $0.id == card.id }
+                                                appState.deleteVocabCard(card.id)
                                             }
                                         }
                                     )
                                 }
                             } else {
-                                ForEach(grammarCards) { card in
+                                ForEach(appState.grammarCards) { card in
                                     GrammarCardRow(
                                         card: card,
                                         onDelete: {
                                             withAnimation {
-                                                grammarCards.removeAll { $0.id == card.id }
+                                                appState.deleteGrammarCard(card.id)
                                             }
                                         }
                                     )
@@ -132,8 +131,10 @@ struct CardLibraryView: View {
                 .multilineTextAlignment(.center)
                 .lineSpacing(4)
 
-            PrimaryButton(title: "上传聊天截图", icon: "camera.fill", isFullWidth: false) {}
-                .padding(.top, 22)
+            PrimaryButton(title: "上传聊天截图", icon: "camera.fill", isFullWidth: false) {
+                appState.selectedTab = .analysis
+            }
+            .padding(.top, 22)
 
             Spacer()
         }
@@ -294,4 +295,5 @@ struct GrammarCardRow: View {
 
 #Preview {
     CardLibraryView()
+        .environment(AppState())
 }

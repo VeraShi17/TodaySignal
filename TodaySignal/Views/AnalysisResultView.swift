@@ -1,12 +1,12 @@
 import SwiftUI
 
 struct AnalysisResultView: View {
-    @State private var results = MockData.analysisResults
-    @State private var showCardPreview = false
-    @State private var previewCardType: LearningCardType = .vocabulary
+    @Environment(AppState.self) private var appState
     var onDone: () -> Void
 
     var body: some View {
+        @Bindable var appState = appState
+
         ZStack {
             Color.bgPage.ignoresSafeArea()
 
@@ -30,7 +30,7 @@ struct AnalysisResultView: View {
 
                     // Progress meta
                     HStack(spacing: 8) {
-                        Text("解析 \(results.count) 条")
+                        Text("解析 \(appState.analysisResults.count) 条")
                             .font(.system(size: 12, weight: .bold))
                             .foregroundStyle(Color.ink2)
                             .tracking(0.4)
@@ -47,8 +47,8 @@ struct AnalysisResultView: View {
                         }
                         .frame(height: 4)
 
-                        let vocabCount = results.flatMap(\.vocabulary).count
-                        let grammarCount = results.flatMap(\.grammarPoints).count
+                        let vocabCount = appState.analysisResults.flatMap(\.vocabulary).count
+                        let grammarCount = appState.analysisResults.flatMap(\.grammarPoints).count
                         Text("\(vocabCount) 个生词 · \(grammarCount) 个语法")
                             .font(.system(size: 11))
                             .foregroundStyle(Color.inkMute)
@@ -56,15 +56,15 @@ struct AnalysisResultView: View {
                     .padding(.bottom, 14)
 
                     // Analysis bubble cards
-                    ForEach(Array(results.enumerated()), id: \.element.id) { index, result in
+                    ForEach(Array(appState.analysisResults.enumerated()), id: \.element.id) { index, result in
                         AnalysisBubbleCardView(
                             result: result,
+                            idolSide: appState.idolSide,
                             onKnowledgeAction: { pointId, action in
-                                updateKnowledgeAction(resultIndex: index, pointId: pointId, action: action)
+                                appState.updateKnowledgeAction(resultIndex: index, pointId: pointId, action: action)
                             },
                             onShowCardPreview: { cardType in
-                                previewCardType = cardType
-                                showCardPreview = true
+                                // Card preview is now triggered by AppState.updateKnowledgeAction
                             }
                         )
                         .padding(.bottom, 16)
@@ -86,10 +86,10 @@ struct AnalysisResultView: View {
                             .font(.system(size: 12))
                             .foregroundStyle(Color.inkMute)
                         HStack(spacing: 0) {
-                            Text("\(savedCount)")
+                            Text("\(appState.savedCount)")
                                 .font(.system(size: 16, weight: .bold))
                                 .foregroundStyle(Color.pinkDeep)
-                            Text(" 个卡片 + \(knownCount) 个已认识")
+                            Text(" 个卡片 + \(appState.knownCount) 个已认识")
                                 .font(.system(size: 16, weight: .bold))
                                 .foregroundStyle(Color.ink)
                         }
@@ -127,34 +127,18 @@ struct AnalysisResultView: View {
                     .foregroundStyle(Color.pink)
             }
         }
-        .sheet(isPresented: $showCardPreview) {
+        .sheet(isPresented: $appState.showCardPreview) {
             CardPreviewModal(
-                cardType: previewCardType,
-                onDismiss: { showCardPreview = false }
+                vocabCard: appState.previewVocabCard,
+                grammarCard: appState.previewGrammarCard,
+                onDismiss: { appState.showCardPreview = false },
+                onGoToLibrary: {
+                    appState.showCardPreview = false
+                    onDone()
+                }
             )
             .presentationDetents([.large])
             .presentationDragIndicator(.visible)
-        }
-    }
-
-    private var savedCount: Int {
-        results.flatMap { $0.vocabulary + $0.grammarPoints }.filter { $0.action == .saved }.count
-    }
-
-    private var knownCount: Int {
-        results.flatMap { $0.vocabulary + $0.grammarPoints }.filter { $0.action == .known }.count
-    }
-
-    private func updateKnowledgeAction(resultIndex: Int, pointId: UUID, action: KnowledgeAction) {
-        // Check vocabulary
-        if let vi = results[resultIndex].vocabulary.firstIndex(where: { $0.id == pointId }) {
-            results[resultIndex].vocabulary[vi].action = action
-            return
-        }
-        // Check grammar
-        if let gi = results[resultIndex].grammarPoints.firstIndex(where: { $0.id == pointId }) {
-            results[resultIndex].grammarPoints[gi].action = action
-            return
         }
     }
 }
@@ -163,6 +147,7 @@ struct AnalysisResultView: View {
 
 struct AnalysisBubbleCardView: View {
     let result: AnalysisResult
+    var idolSide: BubbleSide = .left
     var onKnowledgeAction: (UUID, KnowledgeAction) -> Void
     var onShowCardPreview: (LearningCardType) -> Void
 
@@ -175,7 +160,7 @@ struct AnalysisBubbleCardView: View {
                     speakerRole: result.isUserReply ? .user : .idol,
                     text: result.originalText
                 ),
-                idolSide: .left
+                idolSide: idolSide
             )
 
             if result.isUserReply {
@@ -237,10 +222,8 @@ struct AnalysisBubbleCardView: View {
                         point: point,
                         onKnow: { onKnowledgeAction(point.id, .known) },
                         onSkip: { onKnowledgeAction(point.id, .dismissed) },
-                        onSave: {
-                            onKnowledgeAction(point.id, .saved)
-                            onShowCardPreview(.vocabulary)
-                        }
+                        onSave: { onKnowledgeAction(point.id, .saved) },
+                        onUndo: { onKnowledgeAction(point.id, .open) }
                     )
                 }
             }
@@ -260,10 +243,8 @@ struct AnalysisBubbleCardView: View {
                         point: point,
                         onKnow: { onKnowledgeAction(point.id, .known) },
                         onSkip: { onKnowledgeAction(point.id, .dismissed) },
-                        onSave: {
-                            onKnowledgeAction(point.id, .saved)
-                            onShowCardPreview(.grammar)
-                        }
+                        onSave: { onKnowledgeAction(point.id, .saved) },
+                        onUndo: { onKnowledgeAction(point.id, .open) }
                     )
                 }
             }
@@ -338,5 +319,10 @@ struct AnalysisBubbleCardView: View {
 #Preview {
     NavigationStack {
         AnalysisResultView(onDone: {})
+            .environment({
+                let state = AppState()
+                state.analysisResults = MockData.analysisResults
+                return state
+            }())
     }
 }

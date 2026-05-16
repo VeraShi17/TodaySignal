@@ -1,29 +1,19 @@
 import SwiftUI
 
 struct MainTabView: View {
-    @State private var selectedTab: Tab = .analysis
-    @State private var navigationPath = NavigationPath()
-
-    enum Tab: String {
-        case analysis = "解析"
-        case library = "卡片库"
-        case settings = "设置"
-    }
-
-    enum AnalysisRoute: Hashable {
-        case textConfirmation
-        case analysisResult
-    }
+    @Environment(AppState.self) private var appState
 
     var body: some View {
-        TabView(selection: $selectedTab) {
-            NavigationStack(path: $navigationPath) {
+        @Bindable var appState = appState
+
+        TabView(selection: $appState.selectedTab) {
+            NavigationStack(path: $appState.navigationPath) {
                 HomeView(
                     onUploadScreenshot: {
-                        navigationPath.append(AnalysisRoute.textConfirmation)
+                        appState.navigationPath.append(AnalysisRoute.textConfirmation)
                     },
                     onPasteText: {
-                        navigationPath.append(AnalysisRoute.textConfirmation)
+                        appState.navigationPath.append(AnalysisRoute.textConfirmation)
                     }
                 )
                 .navigationBarHidden(true)
@@ -32,17 +22,16 @@ struct MainTabView: View {
                     case .textConfirmation:
                         TextConfirmationView(
                             onAnalyze: {
-                                navigationPath.append(AnalysisRoute.analysisResult)
+                                appState.startAnalysis()
                             },
                             onBack: {
-                                navigationPath.removeLast()
+                                appState.navigationPath.removeLast()
                             }
                         )
                     case .analysisResult:
                         AnalysisResultView(
                             onDone: {
-                                navigationPath = NavigationPath()
-                                selectedTab = .library
+                                appState.navigateToLibrary()
                             }
                         )
                     }
@@ -51,19 +40,19 @@ struct MainTabView: View {
             .tabItem {
                 Label("解析", systemImage: "sparkle")
             }
-            .tag(Tab.analysis)
+            .tag(AppState.MainTab.analysis)
 
             CardLibraryView()
                 .tabItem {
                     Label("卡片库", systemImage: "book.fill")
                 }
-                .tag(Tab.library)
+                .tag(AppState.MainTab.library)
 
             SettingsView()
                 .tabItem {
                     Label("设置", systemImage: "gearshape.fill")
                 }
-                .tag(Tab.settings)
+                .tag(AppState.MainTab.settings)
         }
         .tint(Color.pink)
     }
@@ -71,4 +60,5 @@ struct MainTabView: View {
 
 #Preview {
     MainTabView()
+        .environment(AppState())
 }

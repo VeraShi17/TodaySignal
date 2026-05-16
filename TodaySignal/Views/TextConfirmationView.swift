@@ -1,12 +1,13 @@
 import SwiftUI
 
 struct TextConfirmationView: View {
-    @State private var bubbles: [ChatBubble] = MockData.chatBubbles
-    @State private var idolSide: BubbleSide = .left
+    @Environment(AppState.self) private var appState
     var onAnalyze: () -> Void
     var onBack: () -> Void
 
     var body: some View {
+        @Bindable var appState = appState
+
         ZStack(alignment: .bottom) {
             Color.bgPage.ignoresSafeArea()
 
@@ -32,14 +33,14 @@ struct TextConfirmationView: View {
 
                     // Chat bubbles
                     VStack(spacing: 10) {
-                        ForEach(bubbles) { bubble in
+                        ForEach(appState.chatBubbles) { bubble in
                             ChatBubbleView(
                                 bubble: bubble,
-                                idolSide: idolSide,
+                                idolSide: appState.idolSide,
                                 showEditControls: true,
                                 onDelete: {
                                     withAnimation {
-                                        bubbles.removeAll { $0.id == bubble.id }
+                                        appState.chatBubbles.removeAll { $0.id == bubble.id }
                                     }
                                 }
                             )
@@ -86,8 +87,8 @@ struct TextConfirmationView: View {
                     // Side selector
                     HStack(spacing: 0) {
                         ForEach([BubbleSide.left, .right], id: \.self) { side in
-                            let isSelected = side == idolSide
-                            Button(action: { withAnimation(.easeInOut(duration: 0.2)) { idolSide = side } }) {
+                            let isSelected = side == appState.idolSide
+                            Button(action: { withAnimation(.easeInOut(duration: 0.2)) { appState.idolSide = side } }) {
                                 HStack(spacing: 6) {
                                     Text(side == .left ? "← 左侧" : "右侧 →")
                                         .font(.system(size: 14, weight: .semibold))
@@ -141,5 +142,6 @@ struct TextConfirmationView: View {
 #Preview {
     NavigationStack {
         TextConfirmationView(onAnalyze: {}, onBack: {})
+            .environment(AppState())
     }
 }

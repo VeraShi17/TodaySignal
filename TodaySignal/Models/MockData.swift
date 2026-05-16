@@ -147,8 +147,9 @@ struct VocabularyCard: Identifiable {
     let exampleSentence: String
     let exampleTranslationZH: String
     let usageNote: String
+    let sourcePointId: UUID?  // tracks which KnowledgePoint generated this card
 
-    init(id: UUID = UUID(), word: String, meaningZH: String, pronunciation: String, partOfSpeech: String, originalSentence: String, exampleSentence: String, exampleTranslationZH: String, usageNote: String) {
+    init(id: UUID = UUID(), word: String, meaningZH: String, pronunciation: String, partOfSpeech: String, originalSentence: String, exampleSentence: String, exampleTranslationZH: String, usageNote: String, sourcePointId: UUID? = nil) {
         self.id = id
         self.word = word
         self.meaningZH = meaningZH
@@ -158,6 +159,7 @@ struct VocabularyCard: Identifiable {
         self.exampleSentence = exampleSentence
         self.exampleTranslationZH = exampleTranslationZH
         self.usageNote = usageNote
+        self.sourcePointId = sourcePointId
     }
 }
 
@@ -169,8 +171,9 @@ struct GrammarCard: Identifiable {
     let originalSentence: String
     let exampleSentences: [(ko: String, zh: String)]
     let usageContext: String
+    let sourcePointId: UUID?  // tracks which KnowledgePoint generated this card
 
-    init(id: UUID = UUID(), point: String, meaningZH: String, toneNote: String, originalSentence: String, exampleSentences: [(ko: String, zh: String)], usageContext: String) {
+    init(id: UUID = UUID(), point: String, meaningZH: String, toneNote: String, originalSentence: String, exampleSentences: [(ko: String, zh: String)], usageContext: String, sourcePointId: UUID? = nil) {
         self.id = id
         self.point = point
         self.meaningZH = meaningZH
@@ -178,6 +181,7 @@ struct GrammarCard: Identifiable {
         self.originalSentence = originalSentence
         self.exampleSentences = exampleSentences
         self.usageContext = usageContext
+        self.sourcePointId = sourcePointId
     }
 }
 

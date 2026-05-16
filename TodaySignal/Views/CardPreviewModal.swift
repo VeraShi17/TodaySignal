@@ -1,8 +1,10 @@
 import SwiftUI
 
 struct CardPreviewModal: View {
-    var cardType: LearningCardType = .vocabulary
+    var vocabCard: VocabularyCard?
+    var grammarCard: GrammarCard?
     var onDismiss: () -> Void
+    var onGoToLibrary: () -> Void
 
     var body: some View {
         ZStack(alignment: .bottom) {
@@ -30,20 +32,18 @@ struct CardPreviewModal: View {
                     .clipShape(RoundedRectangle(cornerRadius: 12))
                     .padding(.bottom, 16)
 
-                    // Card content
-                    if cardType == .vocabulary {
-                        VocabFlashcardView(card: MockData.vocabularyCards[0])
-                    } else {
-                        GrammarFlashcardView(card: MockData.grammarCards[0])
+                    // Card content — show the actual generated card
+                    if let vocabCard {
+                        VocabFlashcardView(card: vocabCard)
+                    } else if let grammarCard {
+                        GrammarFlashcardView(card: grammarCard)
                     }
 
                     // Action buttons
                     HStack(spacing: 10) {
                         PrimaryButton(title: "知道了", action: onDismiss)
 
-                        SecondaryButton(title: "查看卡片库", isFullWidth: false) {
-                            onDismiss()
-                        }
+                        SecondaryButton(title: "查看卡片库", isFullWidth: false, action: onGoToLibrary)
                     }
                     .padding(.top, 18)
 
@@ -57,5 +57,9 @@ struct CardPreviewModal: View {
 }
 
 #Preview {
-    CardPreviewModal(cardType: .vocabulary, onDismiss: {})
+    CardPreviewModal(
+        vocabCard: MockData.vocabularyCards[0],
+        onDismiss: {},
+        onGoToLibrary: {}
+    )
 }
