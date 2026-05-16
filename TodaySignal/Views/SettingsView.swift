@@ -1,6 +1,12 @@
 import SwiftUI
 
 struct SettingsView: View {
+    @Environment(AppState.self) private var appState
+
+    #if DEBUG
+    @State private var showClearConfirm = false
+    #endif
+
     var body: some View {
         ZStack {
             Color.bgPage.ignoresSafeArea()
@@ -84,6 +90,42 @@ struct SettingsView: View {
                     .background(.white)
                     .clipShape(RoundedRectangle(cornerRadius: 18))
 
+                    #if DEBUG
+                    sectionTitle("开发调试")
+
+                    VStack(alignment: .leading, spacing: 10) {
+                        Text("用于测试持久化：清空本机卡片、知识点标记、onboarding 状态。")
+                            .font(.system(size: 12.5))
+                            .foregroundStyle(Color.inkMute)
+                            .lineSpacing(3)
+
+                        Button {
+                            showClearConfirm = true
+                        } label: {
+                            HStack(spacing: 8) {
+                                Image(systemName: "trash.circle.fill")
+                                Text("一键清空本地数据（Debug）")
+                                    .fontWeight(.semibold)
+                            }
+                            .font(.system(size: 13.5))
+                            .foregroundStyle(Color(hex: "B3474A"))
+                            .padding(.horizontal, 12)
+                            .padding(.vertical, 10)
+                            .background(Color(hex: "FCEDEE"))
+                            .clipShape(RoundedRectangle(cornerRadius: 12))
+                        }
+
+                        if let clearedAt = appState.lastDebugClearAt {
+                            Text("最近清空：\(clearedAt.formatted(date: .omitted, time: .standard))")
+                                .font(.system(size: 11.5))
+                                .foregroundStyle(Color.inkFaint)
+                        }
+                    }
+                    .padding(16)
+                    .background(.white)
+                    .clipShape(RoundedRectangle(cornerRadius: 18))
+                    #endif
+
                     // About section
                     sectionTitle("关于")
 
@@ -130,6 +172,20 @@ struct SettingsView: View {
                 .padding(.top, 8)
             }
         }
+        #if DEBUG
+        .confirmationDialog(
+            "确认清空本地数据？",
+            isPresented: $showClearConfirm,
+            titleVisibility: .visible
+        ) {
+            Button("清空", role: .destructive) {
+                appState.clearAllLocalDataForDebug()
+            }
+            Button("取消", role: .cancel) {}
+        } message: {
+            Text("将删除卡片、知识点标记，并重置 onboarding。")
+        }
+        #endif
     }
 
     private func sectionTitle(_ title: String) -> some View {
@@ -193,4 +249,5 @@ struct SettingsView: View {
 
 #Preview {
     SettingsView()
+        .environment(AppState())
 }

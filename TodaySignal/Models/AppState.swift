@@ -30,6 +30,10 @@ class AppState {
 
     private let onboardingKey = "today_signal_onboarding_completed"
 
+    #if DEBUG
+    var lastDebugClearAt: Date?
+    #endif
+
     init(
         aiAnalysisService: AIAnalysisServicing = AIAnalysisServiceFactory.makeDefaultService(),
         cardStorageService: CardStorageService = .shared
@@ -274,6 +278,20 @@ class AppState {
     private func knowledgeMarkKey(for point: KnowledgePoint) -> String {
         "\(point.type.rawValue)|\(point.term.trimmingCharacters(in: .whitespacesAndNewlines).lowercased())"
     }
+
+    #if DEBUG
+    func clearAllLocalDataForDebug() {
+        cardStorageService.clearAllPersistedData()
+        UserDefaults.standard.removeObject(forKey: onboardingKey)
+
+        hasCompletedOnboarding = false
+        vocabularyCards = []
+        grammarCards = []
+        persistedKnowledgeMarks = [:]
+        resetForNewSession()
+        lastDebugClearAt = Date()
+    }
+    #endif
 }
 
 // MARK: - Navigation Routes

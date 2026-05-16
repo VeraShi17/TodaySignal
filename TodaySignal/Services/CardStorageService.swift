@@ -233,6 +233,24 @@ struct CardStorageService {
         }
     }
 
+    func clearAllPersistedData() {
+        do {
+            let context = context
+
+            let existingVocab = try context.fetch(FetchDescriptor<PersistedVocabularyCard>())
+            let existingGrammar = try context.fetch(FetchDescriptor<PersistedGrammarCard>())
+            let existingMarks = try context.fetch(FetchDescriptor<PersistedKnowledgeMark>())
+
+            for item in existingVocab { context.delete(item) }
+            for item in existingGrammar { context.delete(item) }
+            for item in existingMarks { context.delete(item) }
+
+            try context.save()
+        } catch {
+            // no-op for MVP
+        }
+    }
+
     private struct ExampleSentenceDTO: Codable {
         let ko: String
         let zh: String
