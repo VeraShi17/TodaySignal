@@ -8,6 +8,10 @@ struct TextConfirmationView: View {
     @State private var editingBubbleId: UUID?
     @State private var editingText = ""
 
+    @State private var showInsertSheet = false
+    @State private var newBubbleText = ""
+    @State private var newBubbleSide: BubbleSide = .left
+
     var body: some View {
         @Bindable var appState = appState
 
@@ -57,13 +61,27 @@ struct TextConfirmationView: View {
                     .padding(.horizontal, 16)
 
                     // Fallback hint
-                    HStack {
-                        Text("气泡识别不太准确？")
-                            .font(.system(size: 12.5))
-                            .foregroundStyle(Color.inkMute)
-                        Text("你可以逐条编辑后再继续")
-                            .font(.system(size: 12.5, weight: .semibold))
-                            .foregroundStyle(Color.pinkDeep)
+                    VStack(alignment: .leading, spacing: 10) {
+                        HStack {
+                            Text("气泡识别不太准确？")
+                                .font(.system(size: 12.5))
+                                .foregroundStyle(Color.inkMute)
+                            Text("你可以逐条编辑后再继续")
+                                .font(.system(size: 12.5, weight: .semibold))
+                                .foregroundStyle(Color.pinkDeep)
+                        }
+
+                        Button {
+                            guard !appState.isAnalyzing else { return }
+                            newBubbleSide = appState.idolSide
+                            newBubbleText = ""
+                            showInsertSheet = true
+                        } label: {
+                            Label("手动插入一条消息", systemImage: "plus.bubble")
+                                .font(.system(size: 12.5, weight: .semibold))
+                                .foregroundStyle(Color.pinkDeep)
+                        }
+                        .disabled(appState.isAnalyzing)
                     }
                     .padding(.horizontal, 12)
                     .padding(.vertical, 10)
@@ -198,6 +216,10 @@ struct TextConfirmationView: View {
                     .presentationDetents([.medium])
             }
         }
+        .sheet(isPresented: $showInsertSheet) {
+            insertSheet
+                .presentationDetents([.medium])
+        }
     }
 
     private func beginEditing(bubble: ChatBubble) {
@@ -252,6 +274,62 @@ struct TextConfirmationView: View {
 
         appState.chatBubbles[index].text = trimmed
         editingBubbleId = nil
+    }
+
+    @ViewBuilder
+    private var insertSheet: some View {
+        NavigationStack {
+            VStack(alignment: .leading, spacing: 14) {
+                Text("如果 OCR 漏掉了某条消息，可以在这里手动补充。")
+                    .font(.system(size: 12.5))
+                    .foregroundStyle(Color.inkMute)
+
+                Picker("消息侧边", selection: $newBubbleSide) {
+                    Text("左侧").tag(BubbleSide.left)
+                    Text("右侧").tag(BubbleSide.right)
+                }
+                .pickerStyle(.segmented)
+
+                TextEditor(text: $newBubbleText)
+                    .scrollContentBackground(.hidden)
+                    .padding(10)
+                    .frame(minHeight: 140)
+                    .background(Color.bgElev)
+                    .clipShape(RoundedRectangle(cornerRadius: 12))
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 12)
+                            .stroke(Color.line, lineWidth: 1)
+                    )
+
+                Spacer()
+            }
+            .padding(18)
+            .navigationTitle("插入消息")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button("取消") { showInsertSheet = false }
+                }
+                ToolbarItem(placement: .confirmationAction) {
+                    Button("保存") {
+                        insertNewBubble()
+                    }
+                    .disabled(newBubbleText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+                }
+            }
+        }
+    }
+
+    private func insertNewBubble() {
+        let trimmed = newBubbleText.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else { return }
+
+        let role: SpeakerRole = newBubbleSide == appState.idolSide ? .idol : .user
+        let newBubble = ChatBubble(side: newBubbleSide, speakerRole: role, text: trimmed)
+        appState.chatBubbles.append(newBubble)
+
+        newBubbleText = ""
+        showInsertSheet = false
     }
 }
 

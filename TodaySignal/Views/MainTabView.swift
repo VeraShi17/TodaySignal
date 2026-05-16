@@ -65,12 +65,22 @@ struct MainTabView: View {
                     case .textConfirmation:
                         TextConfirmationView(
                             onAnalyze: {
-                                Task {
-                                    await appState.startAnalysis()
-                                }
+                                appState.clearAnalysisError()
+                                appState.navigationPath.append(AnalysisRoute.analysisLoading)
                             },
                             onBack: {
                                 appState.navigationPath.removeLast()
+                            }
+                        )
+                    case .analysisLoading:
+                        AnalysisLoadingView(
+                            onFinished: { succeeded in
+                                if succeeded {
+                                    appState.navigationPath.removeLast()
+                                    appState.navigationPath.append(AnalysisRoute.analysisResult)
+                                } else {
+                                    appState.navigationPath.removeLast()
+                                }
                             }
                         )
                     case .analysisResult:

@@ -244,6 +244,19 @@ struct OCRService {
             let shortHangulLabel = containsHangul(line.text) && line.text.count <= 6
             guard shortHangulLabel else { return true }
 
+            // Keep short real messages like "쉬는시간~" / "연습끝~~".
+            let hasChatLikeEnding = line.text.range(of: "[~ㅋㅎㅠ♡.!?]+$", options: .regularExpression) != nil
+            let hasSameRowTimestamp = lines.contains { other in
+                other.text != line.text
+                    && isLikelyTimestamp(other.text)
+                    && abs(other.boundingBox.midY - line.boundingBox.midY) < 0.045
+            }
+            let isWideEnoughToBeMessage = line.boundingBox.width > 0.16
+
+            if hasChatLikeEnding || hasSameRowTimestamp || isWideEnoughToBeMessage {
+                return true
+            }
+
             let hasLargerBubbleUnderIt = lines.contains { candidate in
                 guard candidate.text != line.text else { return false }
 

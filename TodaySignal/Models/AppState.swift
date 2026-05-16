@@ -51,8 +51,8 @@ class AppState {
     // MARK: - Actions
 
     @MainActor
-    func startAnalysis() async {
-        guard !isAnalyzing else { return }
+    func startAnalysis() async -> Bool {
+        guard !isAnalyzing else { return false }
 
         isAnalyzing = true
         analysisErrorMessage = nil
@@ -63,7 +63,7 @@ class AppState {
             let request = AnalysisRequest(bubbles: chatBubbles, idolSide: idolSide)
             let results = try await aiAnalysisService.analyze(request: request)
             analysisResults = results
-            navigationPath.append(AnalysisRoute.analysisResult)
+            return true
         } catch {
             if let knownError = error as? AIAnalysisError {
                 if let debugMessage = knownError.debugMessage {
@@ -74,6 +74,7 @@ class AppState {
             } else {
                 analysisErrorMessage = "解析失败，请稍后重试。"
             }
+            return false
         }
     }
 
@@ -212,5 +213,6 @@ class AppState {
 
 enum AnalysisRoute: Hashable {
     case textConfirmation
+    case analysisLoading
     case analysisResult
 }
