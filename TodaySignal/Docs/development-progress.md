@@ -4,7 +4,7 @@
 
 **Product Name:** 오늘의 시그널 / Today’s Signal  
 **Product Type:** iOS SwiftUI App  
-**Current Phase:** MVP development planning and SwiftUI prototype implementation  
+**Current Phase:** Phase 3 OCR Integration (first iteration completed)  
 **Target Users:** K-pop / 韩娱粉丝中的初中级韩语学习者
 
 Today’s Signal is an iOS app that helps users understand Korean chat screenshots from idol bubble / DM / social media contexts. Users can upload a chat screenshot or paste Korean text, confirm the extracted chat bubbles, receive AI explanations for Korean vocabulary and grammar, and save unknown expressions as learning cards.
@@ -557,12 +557,12 @@ Privacy copy should include:
 
 | ID | Module | Functionality | Development Order | Status |
 |---|---|---|---:|---|
-| M12.1 | Image Picker | Select screenshot from photo library | 67 | 未开始 |
-| M12.2 | OCRService Skeleton | Service interface for OCR | 68 | 未开始 |
-| M12.3 | Apple Vision OCR | Extract text from image | 69 | 未开始 |
-| M12.4 | OCR Result Mapping | Convert OCR text to editable blocks | 70 | 未开始 |
-| M12.5 | Bubble Detection Heuristic | Attempt basic bubble grouping | 71 | 未开始 |
-| M12.6 | OCR Failure Handling | Invalid input and fallback states | 72 | 未开始 |
+| M12.1 | Image Picker | Select screenshot from photo library | 67 | ✅ 已完成 |
+| M12.2 | OCRService Skeleton | Service interface for OCR | 68 | ✅ 已完成 |
+| M12.3 | Apple Vision OCR | Extract text from image | 69 | ✅ 已完成 |
+| M12.4 | OCR Result Mapping | Convert OCR text to editable blocks | 70 | ✅ 已完成 |
+| M12.5 | Bubble Detection Heuristic | Attempt basic bubble grouping | 71 | ✅ 已完成（基础版） |
+| M12.6 | OCR Failure Handling | Invalid input and fallback states | 72 | ✅ 已完成 |
 
 Recommended approach:
 
@@ -658,11 +658,11 @@ MVP should not save:
 
 | Order | Task | Status |
 |---:|---|---|
-| 18 | Add image picker | 未开始 |
-| 19 | Implement Apple Vision OCR | 未开始 |
-| 20 | Map OCR output to editable lines | 未开始 |
-| 21 | Add basic bubble grouping heuristic | 未开始 |
-| 22 | Add invalid input and OCR fallback states | 未开始 |
+| 18 | Add image picker | ✅ 已完成 |
+| 19 | Implement Apple Vision OCR | ✅ 已完成 |
+| 20 | Map OCR output to editable lines | ✅ 已完成 |
+| 21 | Add basic bubble grouping heuristic | ✅ 已完成（基础版） |
+| 22 | Add invalid input and OCR fallback states | ✅ 已完成 |
 
 ### Phase 4 — AI Analysis
 
@@ -709,6 +709,7 @@ MVP should not save:
 | Design prototype uploaded | `Today's Signal.html` uploaded as design reference |
 | **Phase 1: Static SwiftUI Prototype** | All static UI screens, navigation, mock data, and reusable components implemented |
 | **Phase 2: Local Interactions** | Shared AppState, card generation → library flow, idol side preserved, card preview shows actual card |
+| **Phase 3: OCR Integration (Iteration 1)** | PhotosPicker image upload, Apple Vision OCR, OCR→editable blocks mapping, Home error states, TextConfirmation edit flow |
 
 ### 7.2 In Progress
 
@@ -720,7 +721,6 @@ MVP should not save:
 
 | Item |
 |---|
-| OCR integration (Phase 3) |
 | AI analysis integration (Phase 4) |
 | Local persistence (Phase 5) |
 | MVP QA testing (Phase 6) |
@@ -840,8 +840,6 @@ MVP should not save:
 
 #### What Is NOT Implemented Yet
 
-- Real OCR (Apple Vision framework)
-- Real image upload / photo picker
 - Real LLM API calls
 - Persistent storage (SwiftData / CoreData)
 - Loading / error states for analysis
@@ -849,15 +847,50 @@ MVP should not save:
 
 #### Next Recommended Tasks
 
-1. **Phase 3 — OCR Integration:** Add photo picker, integrate Apple Vision OCR, map OCR output to editable chat bubbles.
-2. **Phase 4 — AI Analysis:** Design structured prompt, connect to LLM API, validate JSON output.
-3. **Phase 5 — Persistence:** Choose SwiftData or local JSON, persist cards and knowledge marks.
+1. **Phase 4 — AI Analysis:** Design structured prompt, connect to LLM API, validate JSON output.
+2. **Phase 5 — Persistence:** Choose SwiftData or local JSON, persist cards and knowledge marks.
+3. **Phase 6 — QA/Polish:** Add simulator and real-device coverage for OCR and analysis failure states.
 
 #### Known Issues
 
 - All state is in-memory; app resets on launch (persistence is Phase 5).
 - Cards generated from knowledge points use placeholder example sentences ("예문이 곧 생성됩니다.") since real AI generation is not yet implemented.
 - Onboarding shows on every launch until persistence is added.
+
+### 2026-05-16 — Phase 3 OCR Integration (Iteration 1) Complete
+
+#### Created Files
+
+- `Services/OCRService.swift` — Apple Vision OCR service with Korean-priority recognition, line merge heuristic, and ChatBubble mapping.
+
+#### Modified Files
+
+- `Views/MainTabView.swift` — Integrated PhotosPicker flow, OCR async processing, loading overlay, error handling, and routing to TextConfirmationView using OCR output.
+- `Views/HomeView.swift` — Added OCR error/empty-state banner with re-upload entry.
+- `Views/TextConfirmationView.swift` — Added editable text-block sheet (edit/save/cancel) while preserving existing delete and side-selection flow.
+- `Docs/development-progress.md` — Updated Phase 3 status and logs.
+
+#### What Was Implemented
+
+- User can tap "上传聊天截图" to open photo library and select one image.
+- If image selection is canceled, app stays on HomeView without navigation.
+- Selected image runs through Apple Vision OCR (`ko-KR` first, then `en-US`/`zh-Hans`).
+- OCR lines are mapped into editable `ChatBubble` blocks (line-based fallback + simple left/right heuristic by bounding box).
+- OCR success navigates to existing TextConfirmationView with recognized blocks.
+- TextConfirmationView now supports editing each text block in addition to delete.
+- Empty Korean detection and OCR failures show friendly HomeView guidance and keep re-upload path.
+
+#### Known Gaps / Unfinished in Phase 3
+
+- Bubble-side detection is heuristic only (midX split), not true visual bubble segmentation.
+- Non-Korean but useful text is intentionally blocked by current `noKoreanDetected` rule.
+- OCR output currently feeds TextConfirmation only; analysis remains mock (Phase 4 scope).
+
+#### Next Step Recommendation (Phase 4 — AI Analysis Integration)
+
+1. Define `AIAnalysisService` input/output schema based on confirmed bubbles.
+2. Implement prompt + strict JSON validation with fixed tone labels.
+3. Replace `AppState.startAnalysis()` mock path with async service call and add timeout/partial-failure UI.
 
 ---
 

@@ -5,6 +5,9 @@ struct TextConfirmationView: View {
     var onAnalyze: () -> Void
     var onBack: () -> Void
 
+    @State private var editingBubbleId: UUID?
+    @State private var editingText = ""
+
     var body: some View {
         @Bindable var appState = appState
 
@@ -38,6 +41,9 @@ struct TextConfirmationView: View {
                                 bubble: bubble,
                                 idolSide: appState.idolSide,
                                 showEditControls: true,
+                                onEdit: {
+                                    beginEditing(bubble: bubble)
+                                },
                                 onDelete: {
                                     withAnimation {
                                         appState.chatBubbles.removeAll { $0.id == bubble.id }
@@ -53,7 +59,7 @@ struct TextConfirmationView: View {
                         Text("气泡识别不太准确？")
                             .font(.system(size: 12.5))
                             .foregroundStyle(Color.inkMute)
-                        Text("切换为逐行文本")
+                        Text("你可以逐条编辑后再继续")
                             .font(.system(size: 12.5, weight: .semibold))
                             .foregroundStyle(Color.pinkDeep)
                     }
@@ -136,6 +142,73 @@ struct TextConfirmationView: View {
                     .foregroundStyle(Color.pink)
             }
         }
+        .sheet(isPresented: Binding(
+            get: { editingBubbleId != nil },
+            set: { isPresented in
+                if !isPresented {
+                    editingBubbleId = nil
+                }
+            }
+        )) {
+            if let bubbleId = editingBubbleId {
+                editSheet(bubbleId: bubbleId)
+                    .presentationDetents([.medium])
+            }
+        }
+    }
+
+    private func beginEditing(bubble: ChatBubble) {
+        editingText = bubble.text
+        editingBubbleId = bubble.id
+    }
+
+    @ViewBuilder
+    private func editSheet(bubbleId: UUID) -> some View {
+        NavigationStack {
+            VStack(alignment: .leading, spacing: 12) {
+                Text("可直接修正 OCR 内容，删除多余符号后再继续解析。")
+                    .font(.system(size: 12.5))
+                    .foregroundStyle(Color.inkMute)
+
+                TextEditor(text: $editingText)
+                    .scrollContentBackground(.hidden)
+                    .padding(10)
+                    .frame(minHeight: 150)
+                    .background(Color.bgElev)
+                    .clipShape(RoundedRectangle(cornerRadius: 12))
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 12)
+                            .stroke(Color.line, lineWidth: 1)
+                    )
+
+                Spacer()
+            }
+            .padding(18)
+            .navigationTitle("编辑文本块")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button("取消") { editingBubbleId = nil }
+                }
+                ToolbarItem(placement: .confirmationAction) {
+                    Button("保存") {
+                        saveEditedText(for: bubbleId)
+                    }
+                    .disabled(editingText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+                }
+            }
+        }
+    }
+
+    private func saveEditedText(for bubbleId: UUID) {
+        let trimmed = editingText.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard let index = appState.chatBubbles.firstIndex(where: { $0.id == bubbleId }) else {
+            editingBubbleId = nil
+            return
+        }
+
+        appState.chatBubbles[index].text = trimmed
+        editingBubbleId = nil
     }
 }
 
