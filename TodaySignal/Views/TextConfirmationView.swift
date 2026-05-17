@@ -231,7 +231,7 @@ struct TextConfirmationView: View {
     private func editSheet(bubbleId: UUID) -> some View {
         NavigationStack {
             VStack(alignment: .leading, spacing: 12) {
-                Text("可直接修正 OCR 内容，删除多余符号后再继续解析。")
+                Text("可直接修正 OCR 内容。若要拆分成多个气泡，请在段落之间留空行（连按两次回车）。")
                     .font(.system(size: 12.5))
                     .foregroundStyle(Color.inkMute)
 
@@ -272,8 +272,51 @@ struct TextConfirmationView: View {
             return
         }
 
-        appState.chatBubbles[index].text = trimmed
+        let parts = splitBubbleTextIntoSegments(trimmed)
+        if parts.count <= 1 {
+            appState.chatBubbles[index].text = trimmed
+            editingBubbleId = nil
+            return
+        }
+
+        let source = appState.chatBubbles[index]
+        appState.chatBubbles.remove(at: index)
+
+        let newBubbles = parts.map { part in
+            ChatBubble(
+                side: source.side,
+                speakerRole: source.speakerRole,
+                type: source.type,
+                text: part,
+                isEditable: source.isEditable
+            )
+        }
+
+        appState.chatBubbles.insert(contentsOf: newBubbles, at: index)
         editingBubbleId = nil
+    }
+
+    private func splitBubbleTextIntoSegments(_ text: String) -> [String] {
+        text
+            .components(separatedBy: .newlines)
+            .reduce(into: [[String]]()) { groups, line in
+                let normalized = line.trimmingCharacters(in: .whitespaces)
+                if normalized.isEmpty {
+                    if !groups.isEmpty, !groups[groups.count - 1].isEmpty {
+                        groups.append([])
+                    }
+                } else {
+                    if groups.isEmpty {
+                        groups.append([normalized])
+                    } else {
+                        groups[groups.count - 1].append(normalized)
+                    }
+                }
+            }
+            .compactMap { group -> String? in
+                let merged = group.joined(separator: " ").trimmingCharacters(in: .whitespacesAndNewlines)
+                return merged.isEmpty ? nil : merged
+            }
     }
 
     @ViewBuilder

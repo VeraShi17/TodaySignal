@@ -9,6 +9,9 @@ struct MainTabView: View {
     @State private var isPhotoPickerPresented = false
     @State private var isProcessingOCR = false
     @State private var ocrErrorMessage: String?
+    @State private var showPasteTextSheet = false
+    @State private var pastedTextInput = ""
+    @State private var pasteTextErrorMessage: String?
 
     private let ocrService = OCRService()
 
@@ -23,8 +26,9 @@ struct MainTabView: View {
                     },
                     onPasteText: {
                         ocrErrorMessage = nil
-                        appState.chatBubbles = MockData.chatBubbles
-                        appState.navigationPath.append(AnalysisRoute.textConfirmation)
+                        pasteTextErrorMessage = nil
+                        pastedTextInput = ""
+                        showPasteTextSheet = true
                     },
                     ocrErrorMessage: ocrErrorMessage
                 )
@@ -41,6 +45,10 @@ struct MainTabView: View {
                     Task {
                         await processPickedImage(item: newItem)
                     }
+                }
+                .sheet(isPresented: $showPasteTextSheet) {
+                    pasteTextSheet
+                        .presentationDetents([.large])
                 }
                 .overlay {
                     if isProcessingOCR {
@@ -112,6 +120,93 @@ struct MainTabView: View {
         .tint(Color.pink)
     }
 
+    @ViewBuilder
+    private var pasteTextSheet: some View {
+        NavigationStack {
+            VStack(alignment: .leading, spacing: 14) {
+                Text("可直接粘贴韩语聊天文本，按行自动拆分。")
+                    .font(.system(size: 12.5))
+                    .foregroundStyle(Color.inkMute)
+
+                Text("可选格式：`L:` / `R:` 前缀指定左右侧，例如 `L:오늘 뭐해?`。")
+                    .font(.system(size: 12))
+                    .foregroundStyle(Color.inkFaint)
+
+                TextEditor(text: $pastedTextInput)
+                    .scrollContentBackground(.hidden)
+                    .padding(10)
+                    .frame(minHeight: 220)
+                    .background(Color.bgElev)
+                    .clipShape(RoundedRectangle(cornerRadius: 12))
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 12)
+                            .stroke(Color.line, lineWidth: 1)
+                    )
+
+                if let pasteTextErrorMessage {
+                    Text(pasteTextErrorMessage)
+                        .font(.system(size: 12.5))
+                        .foregroundStyle(Color(hex: "B3474A"))
+                        .padding(.horizontal, 10)
+                        .padding(.vertical, 8)
+                        .background(Color(hex: "FCEDEE"))
+                        .clipShape(RoundedRectangle(cornerRadius: 10))
+                }
+
+                Spacer()
+            }
+            .padding(18)
+            .navigationTitle("粘贴韩语文本")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button("取消") {
+                        showPasteTextSheet = false
+                    }
+                }
+                ToolbarItem(placement: .confirmationAction) {
+                    Button("继续") {
+                        continueWithPastedText()
+                    }
+                }
+            }
+        }
+    }
+
+    private func continueWithPastedText() {
+        let bubbles = bubblesFromPastedText(pastedTextInput)
+        guard !bubbles.isEmpty else {
+            pasteTextErrorMessage = "没有检测到可用文本，请至少输入一行韩语内容。"
+            return
+        }
+
+        pasteTextErrorMessage = nil
+        ocrErrorMessage = nil
+        appState.chatBubbles = bubbles
+        appState.idolSide = .left
+        showPasteTextSheet = false
+        appState.navigationPath.append(AnalysisRoute.textConfirmation)
+    }
+
+    private func bubblesFromPastedText(_ rawText: String) -> [ChatBubble] {
+        let lines = rawText
+            .components(separatedBy: .newlines)
+            .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
+            .filter { !$0.isEmpty }
+
+        return lines.compactMap { line in
+            if let content = line.removingPrefix("L:") ?? line.removingPrefix("l:") ?? line.removingPrefix("左:") {
+                return ChatBubble(side: .left, speakerRole: .idol, text: content.trimmingCharacters(in: .whitespaces))
+            }
+
+            if let content = line.removingPrefix("R:") ?? line.removingPrefix("r:") ?? line.removingPrefix("右:") {
+                return ChatBubble(side: .right, speakerRole: .user, text: content.trimmingCharacters(in: .whitespaces))
+            }
+
+            return ChatBubble(side: .left, speakerRole: .idol, text: line)
+        }
+    }
+
     @MainActor
     private func processPickedImage(item: PhotosPickerItem) async {
         guard !isProcessingOCR else { return }
@@ -141,6 +236,13 @@ struct MainTabView: View {
                 ocrErrorMessage = "OCR 识别失败，请重新上传截图或改为粘贴文本。"
             }
         }
+    }
+}
+
+private extension String {
+    func removingPrefix(_ prefix: String) -> String? {
+        guard hasPrefix(prefix) else { return nil }
+        return String(dropFirst(prefix.count))
     }
 }
 

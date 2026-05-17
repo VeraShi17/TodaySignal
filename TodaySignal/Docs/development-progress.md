@@ -4,7 +4,7 @@
 
 **Product Name:** 오늘의 시그널 / Today’s Signal  
 **Product Type:** iOS SwiftUI App  
-**Current Phase:** Phase 3 OCR Integration (first iteration completed)  
+**Current Phase:** Phase 6 Polish & MVP Testing (in progress)  
 **Target Users:** K-pop / 韩娱粉丝中的初中级韩语学习者
 
 Today’s Signal is an iOS app that helps users understand Korean chat screenshots from idol bubble / DM / social media contexts. Users can upload a chat screenshot or paste Korean text, confirm the extracted chat bubbles, receive AI explanations for Korean vocabulary and grammar, and save unknown expressions as learning cards.
@@ -961,6 +961,134 @@ MVP should not save:
 #### Remaining Notes
 
 - Current knowledge-mark key uses `type + term` (MVP-level heuristic); future versions may add stronger normalization.
+
+### 2026-05-17 — Phase 6 MVP Testing & Input Flow Enhancement
+
+#### Modified Files
+
+- `Views/MainTabView.swift` — Replaced mock paste-text jump with real paste-text input sheet, validation, and line-to-bubble parsing.
+- `Docs/testing-checklist-phase6.md` — Added paste-text and timeout/retry test cases.
+- `Docs/development-progress.md` — Updated current phase and this changelog.
+
+#### What Was Implemented
+
+- Home `粘贴韩语文本` now opens an input sheet instead of using mock data directly.
+- Pasted text is split by non-empty lines and converted into editable `ChatBubble`s.
+- Added optional line prefix support for side mapping:
+  - `L:` / `l:` / `左:` => left bubble
+  - `R:` / `r:` / `右:` => right bubble
+- Empty paste input is blocked with inline validation.
+- Confirmation page remains the single editing gate before AI analysis.
+
+#### Testing Additions
+
+- Added manual test cases for paste flow, side-prefix parsing, empty-input validation.
+- Added timeout/network failure scenario in AI flow checklist.
+
+#### Remaining in MVP
+
+- Phase 4: per-bubble partial failure retry model is still pending (currently request-level retry).
+- Phase 6: run full real-device screenshot regression suite and finalize demo script.
+
+### 2026-05-17 — OCR Bubble Region Assignment Iteration
+
+#### Modified Files
+
+- `Services/OCRService.swift` — OCR pipeline upgraded from line-only merge to region-first assignment with fallback; added reaction/nickname robustness refinements.
+- `Docs/development-progress.md` — Added this fix log.
+
+#### What Was Implemented
+
+- Added `DetectedBubbleRegion` intermediate model.
+- New OCR flow:
+  - clean lines
+  - filter system/header/reaction/nickname noise
+  - detect candidate bubble regions
+  - assign OCR lines into region buckets and merge within region
+  - fallback to previous line-merge path when region detection is empty
+- Added explicit reaction counter detection helper (`+10`-like text) and reused in region assembly.
+- Kept short Korean messages by avoiding aggressive single-line short-text deletion.
+
+#### Current Limitations
+
+- Region detection is still geometric heuristic (derived from OCR boxes), not true pixel-level bubble segmentation.
+- Complex mixed layouts may still need manual correction in confirmation view.
+
+### 2026-05-17 — Text Confirmation Manual Split Support
+
+#### Modified Files
+
+- `Views/TextConfirmationView.swift` — added edit-time manual split behavior (blank-line delimiter).
+- `Docs/development-progress.md` — added this feature log.
+
+#### What Was Implemented
+
+- In edit sheet save flow, one bubble can now be split into multiple bubbles.
+- Split rule: users insert blank lines (double return) between segments.
+- On save, each non-empty segment becomes a new bubble, preserving side/role/type.
+- Added inline editing hint text explaining the blank-line split behavior.
+
+#### Why
+
+- OCR edge cases still require manual correction.
+- Manual split significantly improves usability when one OCR bubble contains multiple actual messages.
+
+### 2026-05-17 — OCR Short Tail Line Preservation Hotfix
+
+#### Modified Files
+
+- `Services/OCRService.swift` — improved preservation of short final lines in multi-line bubbles.
+- `Docs/development-progress.md` — added this hotfix log.
+
+#### What Was Implemented
+
+- Relaxed width-ratio constraint for region grouping (`0.18...1.95`).
+- Added explicit short-tail merge path (`<=3` Hangul chars) when vertically adjacent and side-aligned.
+- Lowered minimum region width threshold for Hangul-containing groups (`0.05`) to avoid dropping tiny tail lines.
+
+#### Why
+
+- Real regression: final short line (1–2 chars / short tone fragment) of a multi-line bubble could be split out then discarded.
+- This patch keeps those tail fragments attached to their parent bubble whenever geometry indicates line wrapping.
+
+### 2026-05-17 — OCR Region Over-Split Rebalance Hotfix
+
+#### Modified Files
+
+- `Services/OCRService.swift` — rebalanced region merge thresholds and reduced aggressive long-region splitting.
+- `Docs/development-progress.md` — added this hotfix log.
+
+#### What Was Implemented
+
+- Region-assembled output now runs one extra merge pass before becoming final candidates.
+- Relaxed region line-grouping thresholds (`x` alignment / width ratio / wrap gap) to avoid over-splitting.
+- Long-region split guard now triggers only for very long regions (higher text/line thresholds).
+- Increased paragraph-break threshold in `splitLargeRegionLines` to avoid unnecessary splits.
+
+#### Why
+
+- Previous hotfix solved over-merge but introduced over-split on normal multi-line bubbles.
+- This rebalance aims for midpoint behavior: keep noise filtering while reducing fragmentation.
+
+### 2026-05-17 — OCR Region Over-Merge Hotfix
+
+#### Modified Files
+
+- `Services/OCRService.swift` — tightened region grouping thresholds; added long-region guard split by vertical paragraph gaps.
+- `Docs/development-progress.md` — added this hotfix log.
+
+#### What Was Implemented
+
+- Reduced region grouping tolerance to avoid chaining multiple separate bubbles into one giant region.
+- Added width-similarity and tighter wrapped-line gap checks during region detection.
+- Added `splitLargeRegionLines` fallback:
+  - if one assembled region text is abnormally long,
+  - split it into multiple bubble candidates by larger vertical gaps.
+
+#### Why
+
+- Real screenshot regression showed “all useful lines merged into one bubble” even after noise filtering.
+- This hotfix specifically targets over-merge while keeping existing noise filtering gains.
 
 ---
 

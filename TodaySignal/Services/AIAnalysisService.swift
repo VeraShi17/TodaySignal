@@ -1,4 +1,5 @@
 import Foundation
+import os
 
 struct AnalysisRequest {
     let bubbles: [ChatBubble]
@@ -69,6 +70,7 @@ struct OpenAIAnalysisService: AIAnalysisServicing {
     private let apiKey: String
     private let model: String
     private let showDebugErrorDetails: Bool
+    private let logger = Logger(subsystem: "TodaySignal", category: "AIAnalysis")
 
     init(config: OpenAIConfig) throws {
         guard let key = config.apiKey, !key.isEmpty else {
@@ -80,6 +82,9 @@ struct OpenAIAnalysisService: AIAnalysisServicing {
     }
 
     func analyze(request: AnalysisRequest) async throws -> [AnalysisResult] {
+        let startedAt = Date()
+        logger.info("AI analysis started. model=\(self.model, privacy: .public), bubbles=\(request.bubbles.count)")
+
         let idolBubbles = request.bubbles.enumerated().filter {
             !$0.element.text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty &&
             $0.element.side == request.idolSide &&
@@ -137,6 +142,8 @@ struct OpenAIAnalysisService: AIAnalysisServicing {
 
             guard (200...299).contains(http.statusCode) else {
                 let apiErrorMessage = extractOpenAIErrorMessage(from: data)
+                let elapsed = Date().timeIntervalSince(startedAt)
+                logger.error("AI analysis failed. status=\(http.statusCode), elapsed=\(elapsed, format: .fixed(precision: 3))s")
                 throw mapStatusCodeToError(http.statusCode, serverMessage: apiErrorMessage)
             }
 
@@ -147,6 +154,10 @@ struct OpenAIAnalysisService: AIAnalysisServicing {
 
             let outputData = Data(content.utf8)
             let parsed = try JSONDecoder().decode(OpenAIAnalysisEnvelope.self, from: outputData)
+
+            let elapsed = Date().timeIntervalSince(startedAt)
+            logger.info("AI analysis succeeded. items=\(parsed.items.count), elapsed=\(elapsed, format: .fixed(precision: 3))s")
+            print("[AIAnalysis] model=\(model) items=\(parsed.items.count) elapsed=\(String(format: "%.3f", elapsed))s")
 
             return parsed.items.compactMap { item in
                 guard item.bubbleIndex >= 0, item.bubbleIndex < request.bubbles.count else {
@@ -183,12 +194,20 @@ struct OpenAIAnalysisService: AIAnalysisServicing {
                 )
             }
         } catch let error as AIAnalysisError {
+            let elapsed = Date().timeIntervalSince(startedAt)
+            logger.error("AI analysis failed with AIAnalysisError. elapsed=\(elapsed, format: .fixed(precision: 3))s")
             throw error
         } catch let error as URLError where error.code == .timedOut {
+            let elapsed = Date().timeIntervalSince(startedAt)
+            logger.error("AI analysis timeout. elapsed=\(elapsed, format: .fixed(precision: 3))s")
             throw AIAnalysisError.timeout
         } catch let error as URLError {
+            let elapsed = Date().timeIntervalSince(startedAt)
+            logger.error("AI analysis network failure. elapsed=\(elapsed, format: .fixed(precision: 3))s")
             throw AIAnalysisError.serviceUnavailable(message: "Network error: \(error.localizedDescription)")
         } catch {
+            let elapsed = Date().timeIntervalSince(startedAt)
+            logger.error("AI analysis invalid response. elapsed=\(elapsed, format: .fixed(precision: 3))s")
             throw AIAnalysisError.invalidResponse(message: error.localizedDescription)
         }
     }
