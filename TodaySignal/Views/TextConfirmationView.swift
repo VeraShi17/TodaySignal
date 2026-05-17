@@ -82,6 +82,10 @@ struct TextConfirmationView: View {
                                 .foregroundStyle(Color.pinkDeep)
                         }
                         .disabled(appState.isAnalyzing)
+
+                        Text("当前版本中气泡顺序不参与 AI 解析；手动插入默认追加到底部。")
+                            .font(.system(size: 11.5))
+                            .foregroundStyle(Color.inkFaint)
                     }
                     .padding(.horizontal, 12)
                     .padding(.vertical, 10)

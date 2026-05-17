@@ -1014,6 +1014,24 @@ MVP should not save:
 - Region detection is still geometric heuristic (derived from OCR boxes), not true pixel-level bubble segmentation.
 - Complex mixed layouts may still need manual correction in confirmation view.
 
+### 2026-05-17 — Insert Bubble Hint Clarification
+
+#### Modified Files
+
+- `Views/TextConfirmationView.swift` — added explicit hint about manual insert ordering semantics.
+- `Docs/development-progress.md` — added this UX clarification log.
+
+#### What Was Implemented
+
+- Added helper hint under `手动插入一条消息`:
+  - 当前版本气泡顺序不参与 AI 解析
+  - 手动插入默认追加到底部
+
+#### Why
+
+- Prevent user confusion when inserted bubbles always appear at the end.
+- Align UI copy with current analysis behavior (context-order not used yet).
+
 ### 2026-05-17 — OCR Error Alert UX Update
 
 #### Modified Files
