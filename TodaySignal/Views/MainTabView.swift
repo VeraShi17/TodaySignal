@@ -9,6 +9,7 @@ struct MainTabView: View {
     @State private var isPhotoPickerPresented = false
     @State private var isProcessingOCR = false
     @State private var ocrErrorMessage: String?
+    @State private var showOCRErrorAlert = false
     @State private var showPasteTextSheet = false
     @State private var pastedTextInput = ""
     @State private var pasteTextErrorMessage: String?
@@ -29,8 +30,7 @@ struct MainTabView: View {
                         pasteTextErrorMessage = nil
                         pastedTextInput = ""
                         showPasteTextSheet = true
-                    },
-                    ocrErrorMessage: ocrErrorMessage
+                    }
                 )
                 .navigationBarHidden(true)
                 .photosPicker(
@@ -49,6 +49,13 @@ struct MainTabView: View {
                 .sheet(isPresented: $showPasteTextSheet) {
                     pasteTextSheet
                         .presentationDetents([.large])
+                }
+                .alert("识别失败", isPresented: $showOCRErrorAlert) {
+                    Button("我知道了", role: .cancel) {
+                        ocrErrorMessage = nil
+                    }
+                } message: {
+                    Text(ocrErrorMessage ?? "未识别到文字内容，请重新上传更清晰的截图。")
                 }
                 .overlay {
                     if isProcessingOCR {
@@ -233,8 +240,9 @@ struct MainTabView: View {
             if let ocrError = error as? OCRService.OCRServiceError {
                 ocrErrorMessage = ocrError.errorDescription
             } else {
-                ocrErrorMessage = "OCR 识别失败，请重新上传截图或改为粘贴文本。"
+                ocrErrorMessage = "OCR 识别失败，请重新上传更清晰的截图。"
             }
+            showOCRErrorAlert = true
         }
     }
 }

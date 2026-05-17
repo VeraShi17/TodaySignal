@@ -1014,6 +1014,21 @@ MVP should not save:
 - Region detection is still geometric heuristic (derived from OCR boxes), not true pixel-level bubble segmentation.
 - Complex mixed layouts may still need manual correction in confirmation view.
 
+### 2026-05-17 — OCR Error Alert UX Update
+
+#### Modified Files
+
+- `Views/MainTabView.swift` — OCR failure now shows alert with confirm action.
+- `Views/HomeView.swift` — removed inline OCR error banner and re-upload button.
+- `Docs/development-progress.md` — added this UX update log.
+
+#### What Was Implemented
+
+- Replaced Home inline OCR error area with modal alert (`识别失败`).
+- Alert message uses OCR error text (e.g. `未识别到文字内容，请重新上传更清晰的截图。`).
+- Confirm action `我知道了` dismisses alert and keeps user on Home.
+- Removed extra "重新上传截图" inline button as requested.
+
 ### 2026-05-17 — Text Confirmation Manual Split Support
 
 #### Modified Files

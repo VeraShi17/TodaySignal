@@ -3,7 +3,6 @@ import SwiftUI
 struct HomeView: View {
     var onUploadScreenshot: () -> Void
     var onPasteText: () -> Void
-    var ocrErrorMessage: String?
 
     var body: some View {
         ZStack(alignment: .top) {
@@ -76,33 +75,6 @@ struct HomeView: View {
                             .foregroundStyle(Color.ink2)
                     }
                     .padding(.top, 8)
-
-                    if let ocrErrorMessage {
-                        HStack(alignment: .top, spacing: 10) {
-                            Image(systemName: "exclamationmark.triangle.fill")
-                                .font(.system(size: 14))
-                                .foregroundStyle(Color(hex: "D96A1D"))
-                                .padding(.top, 1)
-
-                            VStack(alignment: .leading, spacing: 8) {
-                                Text(ocrErrorMessage)
-                                    .font(.system(size: 12.5))
-                                    .foregroundStyle(Color.ink2)
-                                    .lineSpacing(3)
-
-                                Button("重新上传截图") {
-                                    onUploadScreenshot()
-                                }
-                                .font(.system(size: 12.5, weight: .semibold))
-                                .foregroundStyle(Color.pinkDeep)
-                            }
-                        }
-                        .padding(.horizontal, 12)
-                        .padding(.vertical, 10)
-                        .background(Color(hex: "FFF4EA"))
-                        .clipShape(RoundedRectangle(cornerRadius: 14))
-                        .padding(.bottom, 14)
-                    }
 
                     // Main action card
                     SignalCard {
@@ -205,5 +177,5 @@ struct HomeView: View {
 }
 
 #Preview {
-    HomeView(onUploadScreenshot: {}, onPasteText: {}, ocrErrorMessage: nil)
+    HomeView(onUploadScreenshot: {}, onPasteText: {})
 }
