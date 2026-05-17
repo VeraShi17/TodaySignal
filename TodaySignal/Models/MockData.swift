@@ -115,8 +115,9 @@ struct AnalysisResult: Identifiable {
     let replyIssue: String?
     let suggestedReply: String?
     let suggestedReplyZH: String?
+    let failureMessage: String?
 
-    init(id: UUID = UUID(), bubbleID: UUID = UUID(), originalText: String, translationZH: String, toneLabels: [ToneLabel], vocabulary: [KnowledgePoint] = [], grammarPoints: [KnowledgePoint] = [], isUserReply: Bool = false, replyStatus: ReplyStatus? = nil, replyIssue: String? = nil, suggestedReply: String? = nil, suggestedReplyZH: String? = nil) {
+    init(id: UUID = UUID(), bubbleID: UUID = UUID(), originalText: String, translationZH: String, toneLabels: [ToneLabel], vocabulary: [KnowledgePoint] = [], grammarPoints: [KnowledgePoint] = [], isUserReply: Bool = false, replyStatus: ReplyStatus? = nil, replyIssue: String? = nil, suggestedReply: String? = nil, suggestedReplyZH: String? = nil, failureMessage: String? = nil) {
         self.id = id
         self.bubbleID = bubbleID
         self.originalText = originalText
@@ -129,6 +130,7 @@ struct AnalysisResult: Identifiable {
         self.replyIssue = replyIssue
         self.suggestedReply = suggestedReply
         self.suggestedReplyZH = suggestedReplyZH
+        self.failureMessage = failureMessage
     }
 }
 

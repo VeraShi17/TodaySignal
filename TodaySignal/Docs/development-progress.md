@@ -1014,6 +1014,88 @@ MVP should not save:
 - Region detection is still geometric heuristic (derived from OCR boxes), not true pixel-level bubble segmentation.
 - Complex mixed layouts may still need manual correction in confirmation view.
 
+### 2026-05-17 — Global Knowledge Point Deduplication
+
+#### Modified Files
+
+- `Models/AppState.swift` — added cross-result global dedupe pass for vocabulary/grammar points.
+- `Docs/development-progress.md` — added this dedupe strategy log.
+
+#### What Was Implemented
+
+- Added global dedupe pass over `analysisResults` after:
+  - initial analysis completion
+  - single-item retry completion
+- Dedupe key:
+  - `type + normalized term + normalized meaningZH`
+- This preserves entries with same term but different meanings in different contexts.
+
+#### Why
+
+- Remove repeated points across multiple bubbles while avoiding over-deletion of true semantic variants.
+
+### 2026-05-17 — AI Knowledge Point Deduplication Hotfix
+
+#### Modified Files
+
+- `Services/AIAnalysisService.swift` — added per-result deduplication for grammar/vocabulary points before UI mapping.
+- `Docs/development-progress.md` — added this hotfix log.
+
+#### What Was Implemented
+
+- Added deterministic dedupe pass for knowledge points by normalized key:
+  - `type + normalized term + normalized meaning`
+- Applied dedupe to both vocabulary and grammar lists before constructing `AnalysisResult`.
+
+#### Why
+
+- Real run showed repeated grammar points (e.g. duplicate `-에`) in a single analysis output.
+- This hotfix removes duplicate entries caused by model repetition while preserving distinct points.
+
+### 2026-05-17 — AI Prompt/Schema Grammar Quality Refinement
+
+#### Modified Files
+
+- `Services/AIAnalysisService.swift` — refined system prompt field responsibilities, added grammar `category` schema, and post-processing normalization for grammar meanings.
+- `Docs/development-progress.md` — added this refinement log.
+
+#### What Was Implemented
+
+- Prompt now explicitly separates vocabulary vs grammar responsibilities.
+- Added explicit error/correct examples in prompt for cases like:
+  - `-에` should not use contextual translation as `meaning_zh`
+  - `언제` must be vocabulary word, not category label
+  - `가` (from `가다`) should not be blindly emitted as grammar point
+- Grammar schema now requires `category` from a fixed enum.
+- Added deterministic grammar meaning overrides for high-frequency points (`-에`, `-에서`, `-은/는`, `-이/가`, `-을/를`, `-도`, `(으)면`, `-아/어?`, `-ㄹ게`).
+- Added lightweight vocabulary blacklist cleanup to drop grammar-particle-only items from vocabulary list.
+
+#### Why
+
+- Improve pedagogical quality and consistency of grammar explanation output.
+- Reduce cases where contextual phrase translation leaks into abstract grammar meaning fields.
+
+### 2026-05-17 — Phase 4 Partial Failure Handling Completion
+
+#### Modified Files
+
+- `Models/MockData.swift` — `AnalysisResult` added `failureMessage` field for per-item failure rendering.
+- `Models/AppState.swift` — added result merge with failure placeholders and single-item retry flow.
+- `Views/AnalysisResultView.swift` — failed item card UI + `重试该条` action + in-place loading state.
+- `Docs/development-progress.md` — added this completion log.
+
+#### What Was Implemented
+
+- After analysis request returns, app now fills missing idol-bubble outputs with explicit failed items.
+- Failed items are visible in `解析结果` page instead of silent omission.
+- Users can retry a failed item only (no need to rerun full batch).
+- Retry success replaces that item in place; retry failure keeps failure card state.
+
+#### Phase 4 Status
+
+- `Timeout handling` + `request-level error handling`: done.
+- `Partial failure handling` (per-bubble visible + retry): done.
+
 ### 2026-05-17 — Insert Bubble Hint Clarification
 
 #### Modified Files

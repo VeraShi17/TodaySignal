@@ -23,6 +23,7 @@ class AppState {
     var analysisResults: [AnalysisResult] = []
     var isAnalyzing = false
     var analysisErrorMessage: String?
+    var retryingResultIDs: Set<UUID> = []
 
     private let aiAnalysisService: AIAnalysisServicing
     private let cardStorageService: CardStorageService
@@ -83,7 +84,9 @@ class AppState {
         do {
             let request = AnalysisRequest(bubbles: chatBubbles, idolSide: idolSide)
             let results = try await aiAnalysisService.analyze(request: request)
-            analysisResults = applyPersistedKnowledgeMarks(to: results)
+            let merged = mergeWithFailurePlaceholders(results: results, request: request)
+            let withMarks = applyPersistedKnowledgeMarks(to: merged)
+            analysisResults = deduplicateKnowledgePointsGlobally(in: withMarks)
             return true
         } catch {
             if let knownError = error as? AIAnalysisError {
@@ -101,6 +104,42 @@ class AppState {
 
     func clearAnalysisError() {
         analysisErrorMessage = nil
+    }
+
+    @MainActor
+    func retryFailedResult(resultID: UUID) async {
+        guard let resultIndex = analysisResults.firstIndex(where: { $0.id == resultID }) else { return }
+        let current = analysisResults[resultIndex]
+        guard current.failureMessage != nil else { return }
+        guard let bubble = chatBubbles.first(where: { $0.id == current.bubbleID }) else { return }
+
+        retryingResultIDs.insert(resultID)
+        defer { retryingResultIDs.remove(resultID) }
+
+        do {
+            let request = AnalysisRequest(bubbles: [bubble], idolSide: bubble.side)
+            let retried = try await aiAnalysisService.analyze(request: request)
+            guard let first = retried.first else {
+                analysisResults[resultIndex] = makeFailedAnalysisResult(for: bubble, resultID: current.id)
+                return
+            }
+
+            analysisResults[resultIndex] = applyPersistedKnowledgeMarks(to: [
+                AnalysisResult(
+                    id: current.id,
+                    bubbleID: bubble.id,
+                    originalText: first.originalText,
+                    translationZH: first.translationZH,
+                    toneLabels: first.toneLabels,
+                    vocabulary: first.vocabulary,
+                    grammarPoints: first.grammarPoints,
+                    isUserReply: false
+                )
+            ])[0]
+            analysisResults = deduplicateKnowledgePointsGlobally(in: analysisResults)
+        } catch {
+            analysisResults[resultIndex] = makeFailedAnalysisResult(for: bubble, resultID: current.id)
+        }
     }
 
     /// Update a knowledge point's action state
@@ -177,6 +216,7 @@ class AppState {
         analysisResults = []
         analysisErrorMessage = nil
         isAnalyzing = false
+        retryingResultIDs = []
         navigationPath = NavigationPath()
         selectedTab = .analysis
     }
@@ -198,6 +238,40 @@ class AppState {
     }
 
     // MARK: - Private Helpers
+
+    private func mergeWithFailurePlaceholders(results: [AnalysisResult], request: AnalysisRequest) -> [AnalysisResult] {
+        let idolBubbles = request.bubbles.filter {
+            !$0.text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty &&
+            $0.type == .text &&
+            $0.side == request.idolSide
+        }
+
+        var resultsByBubbleID: [UUID: AnalysisResult] = [:]
+        for result in results {
+            resultsByBubbleID[result.bubbleID] = result
+        }
+
+        return idolBubbles.map { bubble in
+            if let found = resultsByBubbleID[bubble.id] {
+                return found
+            }
+            return makeFailedAnalysisResult(for: bubble)
+        }
+    }
+
+    private func makeFailedAnalysisResult(for bubble: ChatBubble, resultID: UUID = UUID()) -> AnalysisResult {
+        AnalysisResult(
+            id: resultID,
+            bubbleID: bubble.id,
+            originalText: bubble.text,
+            translationZH: "",
+            toneLabels: [],
+            vocabulary: [],
+            grammarPoints: [],
+            isUserReply: false,
+            failureMessage: "该条消息解析失败，可单独重试。"
+        )
+    }
 
     /// Create a VocabularyCard from a KnowledgePoint
     private func createVocabularyCard(from point: KnowledgePoint, sentence: String) -> VocabularyCard {
@@ -277,6 +351,41 @@ class AppState {
 
     private func knowledgeMarkKey(for point: KnowledgePoint) -> String {
         "\(point.type.rawValue)|\(point.term.trimmingCharacters(in: .whitespacesAndNewlines).lowercased())"
+    }
+
+    private func deduplicateKnowledgePointsGlobally(in results: [AnalysisResult]) -> [AnalysisResult] {
+        var seenVocabulary = Set<String>()
+        var seenGrammar = Set<String>()
+
+        return results.map { result in
+            var updated = result
+
+            updated.vocabulary = result.vocabulary.filter { point in
+                let key = globalPointDedupKey(for: point)
+                if seenVocabulary.contains(key) {
+                    return false
+                }
+                seenVocabulary.insert(key)
+                return true
+            }
+
+            updated.grammarPoints = result.grammarPoints.filter { point in
+                let key = globalPointDedupKey(for: point)
+                if seenGrammar.contains(key) {
+                    return false
+                }
+                seenGrammar.insert(key)
+                return true
+            }
+
+            return updated
+        }
+    }
+
+    private func globalPointDedupKey(for point: KnowledgePoint) -> String {
+        let normalizedTerm = point.term.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+        let normalizedMeaning = point.meaningZH.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+        return "\(point.type.rawValue)|\(normalizedTerm)|\(normalizedMeaning)"
     }
 
     #if DEBUG

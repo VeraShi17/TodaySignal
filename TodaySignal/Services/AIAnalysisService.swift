@@ -159,40 +159,44 @@ struct OpenAIAnalysisService: AIAnalysisServicing {
             logger.info("AI analysis succeeded. items=\(parsed.items.count), elapsed=\(elapsed, format: .fixed(precision: 3))s")
             print("[AIAnalysis] model=\(model) items=\(parsed.items.count) elapsed=\(String(format: "%.3f", elapsed))s")
 
-            return parsed.items.compactMap { item in
-                guard item.bubbleIndex >= 0, item.bubbleIndex < request.bubbles.count else {
-                    return nil
-                }
+            return parsed.items
+                .filter { $0.bubbleIndex >= 0 && $0.bubbleIndex < request.bubbles.count }
+                .map { item in
+                    let sourceBubble = request.bubbles[item.bubbleIndex]
 
-                let sourceBubble = request.bubbles[item.bubbleIndex]
+                    let vocabPoints = item.vocabulary
+                        .filter { !shouldDropVocabularyAsGrammarLike($0.word) }
+                        .map { vocab in
+                            KnowledgePoint(
+                                type: .vocabulary,
+                                term: vocab.word,
+                                meaningZH: vocab.meaningZH,
+                                pronunciation: vocab.pronunciation,
+                                partOfSpeech: vocab.partOfSpeech,
+                                usageNote: buildVocabularyUsageNote(surfaceForm: vocab.surfaceForm, usageNote: vocab.usageNote)
+                            )
+                        }
 
-                return AnalysisResult(
-                    bubbleID: sourceBubble.id,
-                    originalText: item.originalText,
-                    translationZH: item.translationZH,
-                    toneLabels: mapToneLabels(item.toneLabels),
-                    vocabulary: item.vocabulary.map {
-                        KnowledgePoint(
-                            type: .vocabulary,
-                            term: $0.word,
-                            meaningZH: $0.meaningZH,
-                            pronunciation: $0.pronunciation,
-                            partOfSpeech: $0.partOfSpeech,
-                            usageNote: buildVocabularyUsageNote(surfaceForm: $0.surfaceForm, usageNote: $0.usageNote)
-                        )
-                    },
-                    grammarPoints: item.grammarPoints.map {
+                    let grammarPoints = item.grammarPoints.map {
                         KnowledgePoint(
                             type: .grammar,
                             term: $0.point,
-                            meaningZH: $0.meaningZH,
+                            meaningZH: normalizeGrammarMeaning(point: $0.point, meaning: $0.meaningZH),
                             toneNote: $0.toneNote,
-                            usageNote: buildGrammarUsageContext(surfaceForm: $0.surfaceForm, usageContext: $0.usageContext)
+                            usageNote: buildGrammarUsageContext(surfaceForm: $0.surfaceForm, usageContext: $0.usageContext, category: $0.category)
                         )
-                    },
-                    isUserReply: false
-                )
-            }
+                    }
+
+                    return AnalysisResult(
+                        bubbleID: sourceBubble.id,
+                        originalText: item.originalText,
+                        translationZH: item.translationZH,
+                        toneLabels: mapToneLabels(item.toneLabels),
+                        vocabulary: deduplicatedKnowledgePoints(vocabPoints),
+                        grammarPoints: deduplicatedKnowledgePoints(grammarPoints),
+                        isUserReply: false
+                    )
+                }
         } catch let error as AIAnalysisError {
             let elapsed = Date().timeIntervalSince(startedAt)
             logger.error("AI analysis failed with AIAnalysisError. elapsed=\(elapsed, format: .fixed(precision: 3))s")
@@ -224,9 +228,70 @@ struct OpenAIAnalysisService: AIAnalysisServicing {
         return "原句形式：\(surfaceForm)\n\(usageNote)"
     }
 
-    private func buildGrammarUsageContext(surfaceForm: String?, usageContext: String) -> String {
-        guard let surfaceForm, !surfaceForm.isEmpty else { return usageContext }
-        return "原句片段：\(surfaceForm)\n\(usageContext)"
+    private func buildGrammarUsageContext(surfaceForm: String?, usageContext: String, category: String?) -> String {
+        let categoryPrefix: String = {
+            guard let category, !category.isEmpty else { return "" }
+            return "类别：\(category)\n"
+        }()
+
+        guard let surfaceForm, !surfaceForm.isEmpty else {
+            return "\(categoryPrefix)\(usageContext)"
+        }
+        return "\(categoryPrefix)原句片段：\(surfaceForm)\n\(usageContext)"
+    }
+
+    private func normalizeGrammarMeaning(point: String, meaning: String) -> String {
+        let key = point.replacingOccurrences(of: " ", with: "")
+        let overrides: [String: String] = [
+            "-에": "在/到（地点、时间、方向等）",
+            "에": "在/到（地点、时间、方向等）",
+            "-에서": "在……（动作发生地点）/从……",
+            "에서": "在……（动作发生地点）/从……",
+            "-은/는": "主题/对比标记",
+            "은/는": "主题/对比标记",
+            "-이/가": "主语标记",
+            "이/가": "主语标记",
+            "-을/를": "宾语标记",
+            "을/를": "宾语标记",
+            "-도": "也",
+            "도": "也",
+            "-(으)면": "如果……的话",
+            "(으)면": "如果……的话",
+            "-아/어": "非敬语平语句尾",
+            "-아/어?": "非敬语平语疑问句尾",
+            "-ㄹ게": "我会……/我来……"
+        ]
+
+        return overrides[key] ?? meaning
+    }
+
+    private func shouldDropVocabularyAsGrammarLike(_ word: String) -> Bool {
+        let normalized = word.trimmingCharacters(in: .whitespacesAndNewlines)
+        let grammarLikeVocabulary: Set<String> = [
+            "에", "은", "는", "이", "가", "을", "를", "도", "만", "에서", "으로", "하고"
+        ]
+        return grammarLikeVocabulary.contains(normalized)
+    }
+
+    private func deduplicatedKnowledgePoints(_ points: [KnowledgePoint]) -> [KnowledgePoint] {
+        var seen = Set<String>()
+        var unique: [KnowledgePoint] = []
+
+        for point in points {
+            let normalizedTerm = point.term
+                .trimmingCharacters(in: .whitespacesAndNewlines)
+                .lowercased()
+            let normalizedMeaning = point.meaningZH
+                .trimmingCharacters(in: .whitespacesAndNewlines)
+                .lowercased()
+            let key = "\(point.type.rawValue)|\(normalizedTerm)|\(normalizedMeaning)"
+
+            if seen.insert(key).inserted {
+                unique.append(point)
+            }
+        }
+
+        return unique
     }
 
     private func mapStatusCodeToError(_ statusCode: Int, serverMessage: String?) -> AIAnalysisError {
@@ -270,11 +335,31 @@ struct OpenAIAnalysisService: AIAnalysisServicing {
         - 活用形、缩写、可爱化写法要在 usage_note 中说明对应标准形。
         - 每条最多 3 个高价值生词。
 
+        字段职责：
+        - vocabulary.word：必须是具体词条，优先词典形。例如 언제、가다、맛있다。不能写“疑问词”“动词”“助词”这类类别名。
+        - vocabulary.meaning_zh：写词条核心含义，例如 언제=什么时候，가다=去/回。
+        - vocabulary.part_of_speech：写词性，例如 疑问副词、动词、形容词、名词。
+
+        - grammar_points.point：必须是具体语法形式，例如 -에、-도、-아/어?、(으)면。
+        - grammar_points.category：必须从以下集合中选择：助词、词尾、连接语法、句型、语气/口语表达。
+        - grammar_points.meaning_zh：只能写抽象语法义，不能写上下文翻译。
+        - grammar_points.surface_form：写原句实际片段。
+        - grammar_points.usage_context：解释该语法在原句中的作用，可以写具体翻译。
+
         语法规则：
-        - grammar_points.point 写语法形式：例如 (으)면、도、-아/어、-ㄹ게。
-        - grammar_points.surface_form 写原句中对应片段。
-        - usage_context 解释它在原句中的语法作用和语气。
+        - 不要把动词活用形误放进 grammar_points，例如 가(来自 가다) 应优先作为 vocabulary。
         - 每条最多 3 个语法点。
+
+        错误示例：
+        - point: "-에", meaning_zh: "到家"（错误：把上下文翻译放进 meaning_zh）
+        - vocabulary.word: "疑问词"（错误：word 应该是 언제）
+        - point: "-가", meaning_zh: "去"（错误：这里应优先是 vocabulary: 가다）
+
+        正确示例：
+        - vocabulary.word: "언제", meaning_zh: "什么时候", part_of_speech: "疑问副词"
+        - vocabulary.word: "가다", surface_form: "가", meaning_zh: "去；回", part_of_speech: "动词"
+        - grammar.point: "-에", surface_form: "집에", meaning_zh: "在/到（地点、时间、方向等）"
+        - grammar.point: "-아/어?", surface_form: "가??", meaning_zh: "非敬语平语疑问句尾"
 
         语气标签只能从以下集合选择：
         ["普通陈述","亲近随意","可爱 / 撒娇","吐槽 / 开玩笑","安慰 / 关心","礼貌表达","冷淡 / 简短"]。
@@ -327,12 +412,16 @@ struct OpenAIAnalysisService: AIAnalysisServicing {
                                     "additionalProperties": false,
                                     "properties": [
                                         "point": ["type": "string"],
+                                        "category": [
+                                            "type": "string",
+                                            "enum": ["助词", "词尾", "连接语法", "句型", "语气/口语表达"]
+                                        ],
                                         "surface_form": ["type": ["string", "null"]],
                                         "meaning_zh": ["type": "string"],
                                         "tone_note": ["type": ["string", "null"]],
                                         "usage_context": ["type": "string"]
                                     ],
-                                    "required": ["point", "surface_form", "meaning_zh", "tone_note", "usage_context"]
+                                    "required": ["point", "category", "surface_form", "meaning_zh", "tone_note", "usage_context"]
                                 ]
                             ]
                         ],
@@ -449,6 +538,7 @@ private struct OpenAIVocabularyItem: Decodable {
 
 private struct OpenAIGrammarItem: Decodable {
     let point: String
+    let category: String
     let surfaceForm: String?
     let meaningZH: String
     let toneNote: String?
@@ -456,6 +546,7 @@ private struct OpenAIGrammarItem: Decodable {
 
     enum CodingKeys: String, CodingKey {
         case point
+        case category
         case surfaceForm = "surface_form"
         case meaningZH = "meaning_zh"
         case toneNote = "tone_note"

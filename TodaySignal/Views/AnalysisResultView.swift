@@ -60,6 +60,12 @@ struct AnalysisResultView: View {
                         AnalysisBubbleCardView(
                             result: result,
                             idolSide: appState.idolSide,
+                            isRetrying: appState.retryingResultIDs.contains(result.id),
+                            onRetryFailed: {
+                                Task {
+                                    await appState.retryFailedResult(resultID: result.id)
+                                }
+                            },
                             onKnowledgeAction: { pointId, action in
                                 appState.updateKnowledgeAction(resultIndex: index, pointId: pointId, action: action)
                             },
@@ -148,6 +154,8 @@ struct AnalysisResultView: View {
 struct AnalysisBubbleCardView: View {
     let result: AnalysisResult
     var idolSide: BubbleSide = .left
+    var isRetrying: Bool = false
+    var onRetryFailed: (() -> Void)?
     var onKnowledgeAction: (UUID, KnowledgeAction) -> Void
     var onShowCardPreview: (LearningCardType) -> Void
 
@@ -182,6 +190,42 @@ struct AnalysisBubbleCardView: View {
 
     @ViewBuilder
     private var idolBubbleAnalysis: some View {
+        if let failureMessage = result.failureMessage {
+            VStack(alignment: .leading, spacing: 8) {
+                HStack(spacing: 8) {
+                    Image(systemName: "exclamationmark.triangle.fill")
+                        .font(.system(size: 12))
+                        .foregroundStyle(Color(hex: "D96A1D"))
+                    Text("该条解析失败")
+                        .font(.system(size: 12.5, weight: .bold))
+                        .foregroundStyle(Color.ink2)
+                }
+
+                Text(failureMessage)
+                    .font(.system(size: 13))
+                    .foregroundStyle(Color.inkMute)
+
+                Button {
+                    onRetryFailed?()
+                } label: {
+                    HStack(spacing: 8) {
+                        if isRetrying {
+                            ProgressView()
+                                .controlSize(.small)
+                        }
+                        Text(isRetrying ? "重试中…" : "重试该条")
+                            .font(.system(size: 12.5, weight: .semibold))
+                    }
+                    .foregroundStyle(Color.pinkDeep)
+                }
+                .disabled(isRetrying)
+            }
+            .padding(12)
+            .background(Color(hex: "FFF4EA"))
+            .clipShape(RoundedRectangle(cornerRadius: 12))
+            .padding(.top, 10)
+        } else {
+
         // Translation
         VStack(alignment: .leading, spacing: 4) {
             Text("中文翻译")
@@ -249,6 +293,7 @@ struct AnalysisBubbleCardView: View {
                 }
             }
             .padding(.top, 12)
+        }
         }
     }
 
