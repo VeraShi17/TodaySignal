@@ -55,8 +55,8 @@ struct AnalysisResultView: View {
                         .padding(.bottom, 16)
                     }
 
-                    if appState.checkMyReplyEnabled, appState.hasMySideBubbles(), let check = appState.myReplyCheckResult {
-                        myReplyCheckSection(check)
+                    if appState.checkMyReplyEnabled, appState.hasMySideBubbles(), !appState.myReplyCheckResults.isEmpty {
+                        myReplyCheckSection(appState.myReplyCheckResults)
                             .padding(.bottom, 16)
                     }
 
@@ -146,11 +146,11 @@ struct AnalysisResultView: View {
     }
 
     @ViewBuilder
-    private func myReplyCheckSection(_ check: ReplyCheckResult) -> some View {
-        let isNatural = check.status == .natural
+    private func myReplyCheckSection(_ checks: [ReplyCheckResult]) -> some View {
+        let naturalCount = checks.filter { $0.status == .natural }.count
+        let needsCount = checks.count - naturalCount
 
         VStack(alignment: .leading, spacing: 10) {
-            // Section header
             HStack(spacing: 8) {
                 RoundedRectangle(cornerRadius: 9)
                     .fill(Color.bgMint)
@@ -164,110 +164,114 @@ struct AnalysisResultView: View {
                     Text("我的回复检查")
                         .font(.system(size: 16, weight: .bold))
                         .foregroundStyle(Color.ink)
-                    Text(isNatural ? "1 条 · 表达自然" : "1 条 · 可以更自然")
+                    Text("\(checks.count) 条 · 自然 \(naturalCount) / 可优化 \(needsCount)")
                         .font(.system(size: 11.5))
                         .foregroundStyle(Color.inkMute)
                 }
                 Spacer()
             }
 
-            // Reply check card
-            VStack(alignment: .leading, spacing: 10) {
-                // status badges row
-                HStack(spacing: 6) {
-                    Text("我的回复")
-                        .font(.system(size: 10.5, weight: .bold))
-                        .tracking(0.4)
-                        .foregroundStyle(Color(hex: "3F8F66"))
-                        .padding(.horizontal, 9)
-                        .padding(.vertical, 3)
-                        .background(Color.bgMint)
-                        .clipShape(Capsule())
-
-                    TonePillView(
-                        text: isNatural ? "✓ 表达自然" : "可以更自然一点",
-                        kind: isNatural ? .mint : .cream
-                    )
-                    Spacer()
-                }
-
-                // Original Korean reply
-                Text(check.originalReply)
-                    .font(.system(size: 15))
-                    .foregroundStyle(Color.ink)
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                    .padding(.horizontal, 14)
-                    .padding(.vertical, 10)
-                    .background(Color.bgElev)
-                    .clipShape(RoundedRectangle(cornerRadius: 14))
-                    .overlay(
-                        RoundedRectangle(cornerRadius: 14)
-                            .stroke(Color.line, lineWidth: 1)
-                    )
-
-                // Body feedback
-                Text(check.feedbackZh)
-                    .font(.system(size: 13))
-                    .foregroundStyle(Color.ink2)
-                    .lineSpacing(4)
-
-                // Suggestion box (only when needs improvement)
-                if !isNatural, let suggestedKo = check.suggestedReplyKo {
-                    VStack(alignment: .leading, spacing: 6) {
-                        HStack {
-                            Text("更自然的说法")
-                                .font(.system(size: 10.5, weight: .bold))
-                                .tracking(0.5)
-                                .foregroundStyle(Color(hex: "3F8F66"))
-                            Spacer()
-                            Button {
-                                UIPasteboard.general.string = suggestedKo
-                            } label: {
-                                HStack(spacing: 4) {
-                                    Image(systemName: "doc.on.doc")
-                                        .font(.system(size: 11, weight: .semibold))
-                                    Text("复制")
-                                        .font(.system(size: 12, weight: .semibold))
-                                }
-                                .foregroundStyle(Color.ink2)
-                                .padding(.horizontal, 10)
-                                .frame(height: 28)
-                                .background(.white)
-                                .clipShape(Capsule())
-                                .overlay(
-                                    Capsule().stroke(Color.line2, lineWidth: 1)
-                                )
-                            }
-                            .buttonStyle(.plain)
-                        }
-
-                        Text(suggestedKo)
-                            .font(.system(size: 15.5, weight: .semibold))
-                            .foregroundStyle(Color.ink)
-
-                        if let suggestedZh = check.suggestedReplyZh {
-                            Text(suggestedZh)
-                                .font(.system(size: 12.5))
-                                .foregroundStyle(Color.inkMute)
-                        }
-                    }
-                    .padding(12)
-                    .background(Color.bgMint)
-                    .clipShape(RoundedRectangle(cornerRadius: 14))
-                    .overlay(
-                        RoundedRectangle(cornerRadius: 14)
-                            .stroke(Color.mintSoft, style: StrokeStyle(lineWidth: 1, dash: [4, 3]))
-                    )
-                }
+            ForEach(checks) { check in
+                myReplyCheckCard(check)
             }
-            .padding(14)
-            .background(.white)
-            .clipShape(RoundedRectangle(cornerRadius: 18))
-            .overlay(
-                RoundedRectangle(cornerRadius: 18)
-                    .stroke(isNatural ? Color.mintSoft : Color.pinkSoft, lineWidth: 1)
-            )
         }
+    }
+
+    @ViewBuilder
+    private func myReplyCheckCard(_ check: ReplyCheckResult) -> some View {
+        let isNatural = check.status == .natural
+
+        VStack(alignment: .leading, spacing: 10) {
+            HStack(spacing: 6) {
+                Text("我的回复")
+                    .font(.system(size: 10.5, weight: .bold))
+                    .tracking(0.4)
+                    .foregroundStyle(Color(hex: "3F8F66"))
+                    .padding(.horizontal, 9)
+                    .padding(.vertical, 3)
+                    .background(Color.bgMint)
+                    .clipShape(Capsule())
+
+                TonePillView(
+                    text: isNatural ? "✓ 表达自然" : "可以更自然一点",
+                    kind: isNatural ? .mint : .cream
+                )
+                Spacer()
+            }
+
+            Text(check.originalReply)
+                .font(.system(size: 15))
+                .foregroundStyle(Color.ink)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .padding(.horizontal, 14)
+                .padding(.vertical, 10)
+                .background(Color.bgElev)
+                .clipShape(RoundedRectangle(cornerRadius: 14))
+                .overlay(
+                    RoundedRectangle(cornerRadius: 14)
+                        .stroke(Color.line, lineWidth: 1)
+                )
+
+            Text(check.feedbackZh)
+                .font(.system(size: 13))
+                .foregroundStyle(Color.ink2)
+                .lineSpacing(4)
+
+            if !isNatural, let suggestedKo = check.suggestedReplyKo {
+                VStack(alignment: .leading, spacing: 6) {
+                    HStack {
+                        Text("更自然的说法")
+                            .font(.system(size: 10.5, weight: .bold))
+                            .tracking(0.5)
+                            .foregroundStyle(Color(hex: "3F8F66"))
+                        Spacer()
+                        Button {
+                            UIPasteboard.general.string = suggestedKo
+                        } label: {
+                            HStack(spacing: 4) {
+                                Image(systemName: "doc.on.doc")
+                                    .font(.system(size: 11, weight: .semibold))
+                                Text("复制")
+                                    .font(.system(size: 12, weight: .semibold))
+                            }
+                            .foregroundStyle(Color.ink2)
+                            .padding(.horizontal, 10)
+                            .frame(height: 28)
+                            .background(.white)
+                            .clipShape(Capsule())
+                            .overlay(
+                                Capsule().stroke(Color.line2, lineWidth: 1)
+                            )
+                        }
+                        .buttonStyle(.plain)
+                    }
+
+                    Text(suggestedKo)
+                        .font(.system(size: 15.5, weight: .semibold))
+                        .foregroundStyle(Color.ink)
+
+                    if let suggestedZh = check.suggestedReplyZh {
+                        Text(suggestedZh)
+                            .font(.system(size: 12.5))
+                            .foregroundStyle(Color.inkMute)
+                    }
+                }
+                .padding(12)
+                .background(Color.bgMint)
+                .clipShape(RoundedRectangle(cornerRadius: 14))
+                .overlay(
+                    RoundedRectangle(cornerRadius: 14)
+                        .stroke(Color.mintSoft, style: StrokeStyle(lineWidth: 1, dash: [4, 3]))
+                )
+            }
+        }
+        .padding(14)
+        .background(.white)
+        .clipShape(RoundedRectangle(cornerRadius: 18))
+        .overlay(
+            RoundedRectangle(cornerRadius: 18)
+                .stroke(isNatural ? Color.mintSoft : Color.pinkSoft, lineWidth: 1)
+        )
     }
 
     @ViewBuilder

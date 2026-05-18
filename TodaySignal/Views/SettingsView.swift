@@ -5,6 +5,7 @@ struct SettingsView: View {
 
     #if DEBUG
     @State private var showClearConfirm = false
+    @State private var debugTelemetrySnapshot: [(counter: DebugTelemetry.Counter, value: Int)] = []
     #endif
 
     var body: some View {
@@ -120,6 +121,51 @@ struct SettingsView: View {
                                 .font(.system(size: 11.5))
                                 .foregroundStyle(Color.inkFaint)
                         }
+
+                        Divider().padding(.vertical, 4)
+
+                        Text("AI 降级计数")
+                            .font(.system(size: 12.5, weight: .semibold))
+                            .foregroundStyle(Color.ink)
+
+                        Text(feedbackHitRateSummary)
+                            .font(.system(size: 11.5, weight: .medium))
+                            .foregroundStyle(Color(hex: "3F6FB8"))
+
+                        Text(replySuggestionHitRateSummary)
+                            .font(.system(size: 11.5, weight: .medium))
+                            .foregroundStyle(Color(hex: "3F6FB8"))
+
+                        Text(replyCheckHitRateSummary)
+                            .font(.system(size: 11.5, weight: .medium))
+                            .foregroundStyle(Color(hex: "3F6FB8"))
+
+                        ForEach(debugTelemetrySnapshot, id: \.counter.rawValue) { item in
+                            HStack {
+                                Text(telemetryLabel(for: item.counter))
+                                    .font(.system(size: 11.5))
+                                    .foregroundStyle(Color.inkMute)
+                                Spacer()
+                                Text("\(item.value)")
+                                    .font(.system(size: 11.5, weight: .semibold))
+                                    .foregroundStyle(Color.ink)
+                            }
+                        }
+
+                        HStack(spacing: 10) {
+                            Button("刷新计数") {
+                                reloadDebugTelemetry()
+                            }
+                            .font(.system(size: 12.5, weight: .medium))
+                            .foregroundStyle(Color(hex: "3F6FB8"))
+
+                            Button("重置计数") {
+                                DebugTelemetry.resetAll()
+                                reloadDebugTelemetry()
+                            }
+                            .font(.system(size: 12.5, weight: .medium))
+                            .foregroundStyle(Color(hex: "B3474A"))
+                        }
                     }
                     .padding(16)
                     .background(.white)
@@ -173,6 +219,9 @@ struct SettingsView: View {
             }
         }
         #if DEBUG
+        .onAppear {
+            reloadDebugTelemetry()
+        }
         .confirmationDialog(
             "确认清空本地数据？",
             isPresented: $showClearConfirm,
@@ -187,6 +236,115 @@ struct SettingsView: View {
         }
         #endif
     }
+
+    #if DEBUG
+    private func reloadDebugTelemetry() {
+        let order: [DebugTelemetry.Counter] = [
+            .feedbackRequestTotal,
+            .feedbackFallbackTotal,
+            .feedbackEmptyAnswer,
+            .feedbackAnswerTooLong,
+            .replySuggestionRequestTotal,
+            .replySuggestionFallbackTotal,
+            .replyItemCountMismatch,
+            .replyEmptyField,
+            .replyTooLong,
+            .replyMissingHangul,
+            .replyDuplicateReply,
+            .replyCheckItemCountMismatch,
+            .replyCheckEmptyFeedback,
+            .replyCheckNaturalHasSuggestion,
+            .replyCheckNeedsSuggestionMissing,
+            .replyCheckSuggestionMissingHangul,
+            .replyCheckSuggestionTooLong,
+            .replyCheckRequestTotal,
+            .replyCheckFallbackTotal
+        ]
+
+        let values = Dictionary(uniqueKeysWithValues: DebugTelemetry.snapshot().map { ($0.counter, $0.value) })
+        debugTelemetrySnapshot = order.map { ($0, values[$0] ?? 0) }
+    }
+
+    private var feedbackHitRateSummary: String {
+        hitRateSummary(
+            title: "追问",
+            totalCounter: .feedbackRequestTotal,
+            fallbackCounter: .feedbackFallbackTotal
+        )
+    }
+
+    private var replySuggestionHitRateSummary: String {
+        hitRateSummary(
+            title: "回复建议",
+            totalCounter: .replySuggestionRequestTotal,
+            fallbackCounter: .replySuggestionFallbackTotal
+        )
+    }
+
+    private var replyCheckHitRateSummary: String {
+        hitRateSummary(
+            title: "回复检查",
+            totalCounter: .replyCheckRequestTotal,
+            fallbackCounter: .replyCheckFallbackTotal
+        )
+    }
+
+    private func hitRateSummary(title: String, totalCounter: DebugTelemetry.Counter, fallbackCounter: DebugTelemetry.Counter) -> String {
+        let total = debugTelemetrySnapshot.first(where: { $0.counter == totalCounter })?.value ?? 0
+        let fallback = debugTelemetrySnapshot.first(where: { $0.counter == fallbackCounter })?.value ?? 0
+
+        guard total > 0 else {
+            return "\(title)：暂无请求记录"
+        }
+
+        let pass = max(total - fallback, 0)
+        let rate = Int((Double(pass) / Double(total) * 100).rounded())
+        return "\(title)命中率：\(rate)%（通过 \(pass) / 总计 \(total)，fallback \(fallback)）"
+    }
+
+    private func telemetryLabel(for counter: DebugTelemetry.Counter) -> String {
+        switch counter {
+        case .feedbackRequestTotal:
+            return "追问：总请求数"
+        case .feedbackFallbackTotal:
+            return "追问：fallback 次数"
+        case .feedbackEmptyAnswer:
+            return "追问：空回答降级"
+        case .feedbackAnswerTooLong:
+            return "追问：回答过长截断"
+        case .replySuggestionRequestTotal:
+            return "回复建议：总请求数"
+        case .replySuggestionFallbackTotal:
+            return "回复建议：fallback 次数"
+        case .replyItemCountMismatch:
+            return "回复建议：条数不匹配"
+        case .replyEmptyField:
+            return "回复建议：字段为空"
+        case .replyTooLong:
+            return "回复建议：字段过长"
+        case .replyMissingHangul:
+            return "回复建议：韩文缺失"
+        case .replyDuplicateReply:
+            return "回复建议：候选重复"
+        case .replyCheckItemCountMismatch:
+            return "回复检查：条数不匹配"
+        case .replyCheckEmptyFeedback:
+            return "回复检查：反馈为空"
+        case .replyCheckNaturalHasSuggestion:
+            return "回复检查：natural 含建议"
+        case .replyCheckNeedsSuggestionMissing:
+            return "回复检查：需改进但缺建议"
+        case .replyCheckSuggestionMissingHangul:
+            return "回复检查：建议韩文缺失"
+        case .replyCheckSuggestionTooLong:
+            return "回复检查：建议字段过长"
+        case .replyCheckRequestTotal:
+            return "回复检查：总请求数"
+        case .replyCheckFallbackTotal:
+            return "回复检查：fallback 次数"
+        }
+    }
+    #endif
 
     private func sectionTitle(_ title: String) -> some View {
         Text(title)

@@ -34,7 +34,7 @@ class AppState {
     var analysisErrorMessage: String?
     var retryingResultIDs: Set<UUID> = []
 
-    var myReplyCheckResult: ReplyCheckResult?
+    var myReplyCheckResults: [ReplyCheckResult] = []
     /// Per-bubble feedback chat threads keyed by AnalysisResult.id.
     /// V1 keeps these in-memory only; never persisted.
     var feedbackThreads: [UUID: [FeedbackMessage]] = [:]
@@ -45,6 +45,7 @@ class AppState {
 
     private let aiAnalysisService: AIAnalysisServicing
     private let replySuggestionService: ReplySuggestionServicing
+    private let replyCheckService: ReplyCheckServicing
     private let feedbackChatService: FeedbackChatServicing
     private let cardStorageService: CardStorageService
     private var persistedKnowledgeMarks: [String: KnowledgeAction]
@@ -58,11 +59,13 @@ class AppState {
     init(
         aiAnalysisService: AIAnalysisServicing = AIAnalysisServiceFactory.makeDefaultService(),
         replySuggestionService: ReplySuggestionServicing = ReplySuggestionServiceFactory.makeDefaultService(),
+        replyCheckService: ReplyCheckServicing = ReplyCheckServiceFactory.makeDefaultService(),
         feedbackChatService: FeedbackChatServicing = FeedbackChatServiceFactory.makeDefaultService(),
         cardStorageService: CardStorageService = .shared
     ) {
         self.aiAnalysisService = aiAnalysisService
         self.replySuggestionService = replySuggestionService
+        self.replyCheckService = replyCheckService
         self.feedbackChatService = feedbackChatService
         self.cardStorageService = cardStorageService
         self.persistedKnowledgeMarks = cardStorageService.loadKnowledgeMarks()
@@ -111,7 +114,7 @@ class AppState {
             let merged = mergeWithFailurePlaceholders(results: results, request: request)
             let withMarks = applyPersistedKnowledgeMarks(to: merged)
             analysisResults = deduplicateKnowledgePointsGlobally(in: withMarks)
-            loadMockMyReplyCheckIfNeeded()
+            await loadMyReplyCheckIfNeeded()
             feedbackThreads = [:]
             feedbackErrors = [:]
             feedbackSendingForResultID = nil
@@ -189,13 +192,27 @@ class AppState {
         }
     }
 
-    func loadMockMyReplyCheckIfNeeded() {
+    @MainActor
+    func loadMyReplyCheckIfNeeded() async {
         guard checkMyReplyEnabled && hasMySideBubbles() else {
-            myReplyCheckResult = nil
+            myReplyCheckResults = []
             return
         }
 
-        myReplyCheckResult = Bool.random() ? MockData.v1ReplyCheckNatural : MockData.v1ReplyCheckNeedsImprovement
+        let myBubbles = chatBubbles.filter { $0.side != idolSide && $0.type == .text }
+        let idolBubbles = chatBubbles.filter { $0.side == idolSide && $0.type == .text }
+
+        guard !myBubbles.isEmpty else {
+            myReplyCheckResults = []
+            return
+        }
+
+        do {
+            let results = try await replyCheckService.checkReplies(myBubbles: myBubbles, idolContext: idolBubbles)
+            myReplyCheckResults = results
+        } catch {
+            myReplyCheckResults = []
+        }
     }
 
     @MainActor
@@ -221,7 +238,7 @@ class AppState {
             focusedVocabulary: focused.vocabulary,
             focusedGrammarPoints: focused.grammarPoints,
             nearbyBubbleTexts: nearbyTexts,
-            myReplyCheck: myReplyCheckResult
+            myReplyCheck: myReplyCheckResults.first
         )
 
         do {
@@ -356,7 +373,7 @@ class AppState {
         replyIntentZh = ""
         isGeneratingReply = false
         replyGenerationError = nil
-        myReplyCheckResult = nil
+        myReplyCheckResults = []
         feedbackThreads = [:]
         feedbackSendingForResultID = nil
         feedbackErrors = [:]

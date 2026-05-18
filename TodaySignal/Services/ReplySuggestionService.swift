@@ -55,6 +55,10 @@ struct MockReplySuggestionService: ReplySuggestionServicing {
         let hasContext = !contextBubbles.isEmpty || !(intentZh?.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ?? true)
         guard hasContext else { throw ReplySuggestionError.emptyContext }
 
+        #if DEBUG
+        DebugTelemetry.increment(.replySuggestionRequestTotal)
+        #endif
+
         try await Task.sleep(for: .milliseconds(450))
 
         return MockData.v1ReplySuggestions.map {
@@ -154,9 +158,19 @@ struct OpenAIReplySuggestionService: ReplySuggestionServicing {
             let elapsed = Date().timeIntervalSince(startedAt)
             logger.info("Reply suggestion succeeded. count=\(parsed.items.count), elapsed=\(elapsed, format: .fixed(precision: 3))s")
 
-            return parsed.items.map {
-                ReplySuggestion(replyKo: $0.replyKo, replyZh: $0.replyZh, tone: tone, noteZh: $0.noteZh)
+            let validationResult = validateSuggestions(parsed.items, tone: tone)
+            if let validated = validationResult.suggestions {
+                return validated
             }
+
+            logger.error("Reply suggestion fallback applied. reason=\(validationResult.reason?.rawValue ?? "unknown")")
+            #if DEBUG
+            DebugTelemetry.increment(.replySuggestionFallbackTotal)
+            if let reason = validationResult.reason {
+                trackValidationFailure(reason)
+            }
+            #endif
+            return fallbackSuggestions(tone: tone, intentText: intentText)
         } catch let error as ReplySuggestionError {
             throw error
         } catch let error as URLError where error.code == .timedOut {
@@ -243,6 +257,79 @@ struct OpenAIReplySuggestionService: ReplySuggestionServicing {
         }
         return payload.error.message
     }
+
+    private func validateSuggestions(_ items: [OpenAIReplySuggestionItem], tone: ReplyTone) -> SuggestionValidationResult {
+        guard items.count == 3 else {
+            return SuggestionValidationResult(suggestions: nil, reason: .itemCountMismatch)
+        }
+
+        var usedNormalizedKo = Set<String>()
+        var results: [ReplySuggestion] = []
+
+        for item in items {
+            let replyKo = item.replyKo.trimmingCharacters(in: .whitespacesAndNewlines)
+            let replyZh = item.replyZh.trimmingCharacters(in: .whitespacesAndNewlines)
+            let noteZh = item.noteZh.trimmingCharacters(in: .whitespacesAndNewlines)
+
+            guard !replyKo.isEmpty, !replyZh.isEmpty, !noteZh.isEmpty else {
+                return SuggestionValidationResult(suggestions: nil, reason: .emptyField)
+            }
+
+            guard replyKo.count <= 120, replyZh.count <= 120, noteZh.count <= 100 else {
+                return SuggestionValidationResult(suggestions: nil, reason: .tooLong)
+            }
+
+            guard containsHangul(replyKo) else {
+                return SuggestionValidationResult(suggestions: nil, reason: .missingHangul)
+            }
+
+            let normalizedKo = replyKo.replacingOccurrences(of: " ", with: "").lowercased()
+            guard usedNormalizedKo.insert(normalizedKo).inserted else {
+                return SuggestionValidationResult(suggestions: nil, reason: .duplicateReply)
+            }
+
+            results.append(ReplySuggestion(replyKo: replyKo, replyZh: replyZh, tone: tone, noteZh: noteZh))
+        }
+
+        return SuggestionValidationResult(suggestions: results, reason: nil)
+    }
+
+    private func containsHangul(_ text: String) -> Bool {
+        for scalar in text.unicodeScalars {
+            if (0x1100...0x11FF).contains(scalar.value) ||
+                (0x3130...0x318F).contains(scalar.value) ||
+                (0xAC00...0xD7AF).contains(scalar.value) {
+                return true
+            }
+        }
+        return false
+    }
+
+    private func fallbackSuggestions(tone: ReplyTone, intentText: String) -> [ReplySuggestion] {
+        let intentNote = intentText.isEmpty ? "根据对方消息给出的稳妥回复。" : "优先贴合你输入的意图，做了稳妥表达。"
+        return [
+            ReplySuggestion(replyKo: "좋은 이야기 고마워요 ㅎㅎ", replyZh: "谢谢你分享这个呀，嘿嘿。", tone: tone, noteZh: "礼貌自然，适合大多数场景。\(intentNote)"),
+            ReplySuggestion(replyKo: "나도 그렇게 생각했어 ㅋㅋ", replyZh: "我也是这么想的，哈哈。", tone: tone, noteZh: "朋友感更强，轻松不生硬。\(intentNote)"),
+            ReplySuggestion(replyKo: "맞아, 진짜 공감돼요!", replyZh: "对，真的很有同感！", tone: tone, noteZh: "先接住情绪，再表达认同。\(intentNote)")
+        ]
+    }
+
+    #if DEBUG
+    private func trackValidationFailure(_ reason: SuggestionValidationFailureReason) {
+        switch reason {
+        case .itemCountMismatch:
+            DebugTelemetry.increment(.replyItemCountMismatch)
+        case .emptyField:
+            DebugTelemetry.increment(.replyEmptyField)
+        case .tooLong:
+            DebugTelemetry.increment(.replyTooLong)
+        case .missingHangul:
+            DebugTelemetry.increment(.replyMissingHangul)
+        case .duplicateReply:
+            DebugTelemetry.increment(.replyDuplicateReply)
+        }
+    }
+    #endif
 }
 
 struct ReplySuggestionServiceFactory {
@@ -293,4 +380,17 @@ private struct OpenAIReplySuggestionItem: Decodable {
         case replyZh = "reply_zh"
         case noteZh = "note_zh"
     }
+}
+
+private struct SuggestionValidationResult {
+    let suggestions: [ReplySuggestion]?
+    let reason: SuggestionValidationFailureReason?
+}
+
+private enum SuggestionValidationFailureReason: String {
+    case itemCountMismatch = "item_count_mismatch"
+    case emptyField = "empty_field"
+    case tooLong = "too_long"
+    case missingHangul = "missing_hangul"
+    case duplicateReply = "duplicate_reply"
 }

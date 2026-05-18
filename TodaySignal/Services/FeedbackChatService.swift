@@ -65,6 +65,10 @@ struct MockFeedbackChatService: FeedbackChatServicing {
         let trimmed = question.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmed.isEmpty else { throw FeedbackChatError.emptyQuestion }
 
+        #if DEBUG
+        DebugTelemetry.increment(.feedbackRequestTotal)
+        #endif
+
         try await Task.sleep(for: .milliseconds(450))
         return FeedbackMessage(
             isUser: false,
@@ -145,7 +149,24 @@ struct OpenAIFeedbackChatService: FeedbackChatServicing {
             let elapsed = Date().timeIntervalSince(startedAt)
             logger.info("Feedback chat succeeded. elapsed=\(elapsed, format: .fixed(precision: 3))s")
 
-            return FeedbackMessage(isUser: false, text: parsed.answerZh)
+            let (validatedAnswer, validationStatus) = sanitizeAnswer(parsed.answerZh)
+            switch validationStatus {
+            case .ok:
+                break
+            case .emptyFallback:
+                logger.error("Feedback chat fallback applied. reason=empty_answer")
+                #if DEBUG
+                DebugTelemetry.increment(.feedbackFallbackTotal)
+                DebugTelemetry.increment(.feedbackEmptyAnswer)
+                #endif
+            case .truncated:
+                logger.error("Feedback chat fallback applied. reason=answer_too_long")
+                #if DEBUG
+                DebugTelemetry.increment(.feedbackFallbackTotal)
+                DebugTelemetry.increment(.feedbackAnswerTooLong)
+                #endif
+            }
+            return FeedbackMessage(isUser: false, text: validatedAnswer)
         } catch let error as FeedbackChatError {
             throw error
         } catch let error as URLError where error.code == .timedOut {
@@ -272,6 +293,31 @@ struct OpenAIFeedbackChatService: FeedbackChatServicing {
         }
         return payload.error.message
     }
+
+    private func sanitizeAnswer(_ raw: String) -> (text: String, status: AnswerValidationStatus) {
+        let trimmed = raw.trimmingCharacters(in: .whitespacesAndNewlines)
+
+        guard !trimmed.isEmpty else {
+            return (
+                "我暂时没法稳定解析这次问题。你可以换个更具体的问法，比如直接问某个词尾、语法点或这句怎么自然回复。",
+                .emptyFallback
+            )
+        }
+
+        let maxLength = 500
+        if trimmed.count <= maxLength {
+            return (trimmed, .ok)
+        }
+
+        let truncated = String(trimmed.prefix(maxLength)).trimmingCharacters(in: .whitespacesAndNewlines)
+        return (truncated + "…", .truncated)
+    }
+}
+
+private enum AnswerValidationStatus {
+    case ok
+    case emptyFallback
+    case truncated
 }
 
 struct FeedbackChatServiceFactory {
