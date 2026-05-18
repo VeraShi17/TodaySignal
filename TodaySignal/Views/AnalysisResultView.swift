@@ -30,34 +30,47 @@ struct AnalysisResultView: View {
                     .clipShape(RoundedRectangle(cornerRadius: 14))
                     .padding(.bottom, 16)
 
-                    // Analysis bubble cards
-                    ForEach(Array(appState.analysisResults.enumerated()), id: \.element.id) { index, result in
-                        AnalysisBubbleCardView(
-                            result: result,
-                            idolSide: appState.idolSide,
-                            isRetrying: appState.retryingResultIDs.contains(result.id),
-                            onRetryFailed: {
-                                Task {
-                                    await appState.retryFailedResult(resultID: result.id)
-                                }
-                            },
-                            onKnowledgeAction: { pointId, action in
-                                appState.updateKnowledgeAction(resultIndex: index, pointId: pointId, action: action)
-                            },
-                            onShowCardPreview: { cardType in
-                                // Card preview is now triggered by AppState.updateKnowledgeAction
-                            },
-                            onAskQuestion: {
-                                feedbackInput = ""
-                                focusedResultID = result.id
-                            }
-                        )
-                        .padding(.bottom, 16)
+                    // Follow chat order: idol bubble analysis + inline my-reply checks.
+                    let analysisIndexByBubbleID = Dictionary(
+                        uniqueKeysWithValues: appState.analysisResults.enumerated().map { ($0.element.bubbleID, $0.offset) }
+                    )
+                    let myReplyCheckPairs: [(UUID, ReplyCheckResult)] = appState.myReplyCheckResults.compactMap { check in
+                        guard let bubbleID = check.bubbleID else { return nil }
+                        return (bubbleID, check)
                     }
+                    let myReplyCheckByBubbleID = Dictionary(uniqueKeysWithValues: myReplyCheckPairs)
 
-                    if appState.checkMyReplyEnabled, appState.hasMySideBubbles(), !appState.myReplyCheckResults.isEmpty {
-                        myReplyCheckSection(appState.myReplyCheckResults)
+                    ForEach(appState.chatBubbles.filter { $0.type == .text }, id: \.id) { bubble in
+                        if bubble.side == appState.idolSide,
+                           let resultIndex = analysisIndexByBubbleID[bubble.id] {
+                            let result = appState.analysisResults[resultIndex]
+                            AnalysisBubbleCardView(
+                                result: result,
+                                idolSide: appState.idolSide,
+                                isRetrying: appState.retryingResultIDs.contains(result.id),
+                                onRetryFailed: {
+                                    Task {
+                                        await appState.retryFailedResult(resultID: result.id)
+                                    }
+                                },
+                                onKnowledgeAction: { pointId, action in
+                                    appState.updateKnowledgeAction(resultIndex: resultIndex, pointId: pointId, action: action)
+                                },
+                                onShowCardPreview: { _ in
+                                    // Card preview is now triggered by AppState.updateKnowledgeAction
+                                },
+                                onAskQuestion: {
+                                    feedbackInput = ""
+                                    focusedResultID = result.id
+                                }
+                            )
                             .padding(.bottom, 16)
+                        } else if appState.checkMyReplyEnabled,
+                                  bubble.side != appState.idolSide,
+                                  let check = myReplyCheckByBubbleID[bubble.id] {
+                            myReplyCheckCard(check)
+                                .padding(.bottom, 16)
+                        }
                     }
 
                     Spacer().frame(height: 120)
@@ -141,38 +154,6 @@ struct AnalysisResultView: View {
                 focusedFeedbackSheet(result: result)
                     .presentationDetents([.medium, .large])
                     .presentationDragIndicator(.visible)
-            }
-        }
-    }
-
-    @ViewBuilder
-    private func myReplyCheckSection(_ checks: [ReplyCheckResult]) -> some View {
-        let naturalCount = checks.filter { $0.status == .natural }.count
-        let needsCount = checks.count - naturalCount
-
-        VStack(alignment: .leading, spacing: 10) {
-            HStack(spacing: 8) {
-                RoundedRectangle(cornerRadius: 9)
-                    .fill(Color.bgMint)
-                    .frame(width: 28, height: 28)
-                    .overlay {
-                        Image(systemName: "heart.fill")
-                            .font(.system(size: 14, weight: .semibold))
-                            .foregroundStyle(Color(hex: "3F8F66"))
-                    }
-                VStack(alignment: .leading, spacing: 1) {
-                    Text("我的回复检查")
-                        .font(.system(size: 16, weight: .bold))
-                        .foregroundStyle(Color.ink)
-                    Text("\(checks.count) 条 · 自然 \(naturalCount) / 可优化 \(needsCount)")
-                        .font(.system(size: 11.5))
-                        .foregroundStyle(Color.inkMute)
-                }
-                Spacer()
-            }
-
-            ForEach(checks) { check in
-                myReplyCheckCard(check)
             }
         }
     }
@@ -368,7 +349,7 @@ struct AnalysisResultView: View {
             // Quick chips + input
             VStack(alignment: .leading, spacing: 10) {
                 WrapLayout(spacing: 6, lineSpacing: 6) {
-                    ForEach(["这里为什么这么说？", "这个语气自然吗？", "这几个词连起来怎么看？", "可以怎么回复？"], id: \.self) { chip in
+                    ForEach(["这是敬语还是平语？", "解释下当前句尾的意义？", "和相似句尾有什么区别？", "这句在聊天里自然吗？"], id: \.self) { chip in
                         Button {
                             feedbackInput = chip
                         } label: {

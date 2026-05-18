@@ -238,7 +238,7 @@ class AppState {
             focusedVocabulary: focused.vocabulary,
             focusedGrammarPoints: focused.grammarPoints,
             nearbyBubbleTexts: nearbyTexts,
-            myReplyCheck: myReplyCheckResults.first
+            myReplyCheck: nil
         )
 
         do {
