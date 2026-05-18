@@ -247,6 +247,8 @@ struct SettingsView: View {
             .feedbackTooGeneric,
             .replySuggestionRequestTotal,
             .replySuggestionFallbackTotal,
+            .cardExampleRequestTotal,
+            .cardExampleFallbackTotal,
             .replyItemCountMismatch,
             .replyEmptyField,
             .replyTooLong,
@@ -319,6 +321,10 @@ struct SettingsView: View {
             return "回复建议：总请求数"
         case .replySuggestionFallbackTotal:
             return "回复建议：fallback 次数"
+        case .cardExampleRequestTotal:
+            return "卡片例句：总请求数"
+        case .cardExampleFallbackTotal:
+            return "卡片例句：fallback 次数"
         case .replyItemCountMismatch:
             return "回复建议：条数不匹配"
         case .replyEmptyField:

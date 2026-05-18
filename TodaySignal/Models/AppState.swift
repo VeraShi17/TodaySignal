@@ -47,6 +47,7 @@ class AppState {
     private let replySuggestionService: ReplySuggestionServicing
     private let replyCheckService: ReplyCheckServicing
     private let feedbackChatService: FeedbackChatServicing
+    private let cardExampleService: CardExampleServicing
     private let cardStorageService: CardStorageService
     private var persistedKnowledgeMarks: [String: KnowledgeAction]
 
@@ -61,12 +62,14 @@ class AppState {
         replySuggestionService: ReplySuggestionServicing = ReplySuggestionServiceFactory.makeDefaultService(),
         replyCheckService: ReplyCheckServicing = ReplyCheckServiceFactory.makeDefaultService(),
         feedbackChatService: FeedbackChatServicing = FeedbackChatServiceFactory.makeDefaultService(),
+        cardExampleService: CardExampleServicing = CardExampleServiceFactory.makeDefaultService(),
         cardStorageService: CardStorageService = .shared
     ) {
         self.aiAnalysisService = aiAnalysisService
         self.replySuggestionService = replySuggestionService
         self.replyCheckService = replyCheckService
         self.feedbackChatService = feedbackChatService
+        self.cardExampleService = cardExampleService
         self.cardStorageService = cardStorageService
         self.persistedKnowledgeMarks = cardStorageService.loadKnowledgeMarks()
 
@@ -96,6 +99,8 @@ class AppState {
     var showCardPreview = false
     var previewVocabCard: VocabularyCard?
     var previewGrammarCard: GrammarCard?
+    var isCardPreviewLoadingExamples = false
+    var savingKnowledgePointIDs: Set<UUID> = []
 
     // MARK: - Actions
 
@@ -294,6 +299,16 @@ class AppState {
     func updateKnowledgeAction(resultIndex: Int, pointId: UUID, action: KnowledgeAction) {
         guard resultIndex < analysisResults.count else { return }
 
+        if action == .saved, savingKnowledgePointIDs.contains(pointId) {
+            return
+        }
+
+        #if DEBUG
+        if action == .saved {
+            DebugTelemetry.increment(.cardExampleRequestTotal)
+        }
+        #endif
+
         // Check vocabulary
         if let vi = analysisResults[resultIndex].vocabulary.firstIndex(where: { $0.id == pointId }) {
             let previousAction = analysisResults[resultIndex].vocabulary[vi].action
@@ -303,12 +318,33 @@ class AppState {
             persistKnowledgeMark(for: point, action: action)
 
             if action == .saved {
-                let card = createVocabularyCard(from: point, sentence: analysisResults[resultIndex].originalText)
-                vocabularyCards.insert(card, at: 0)
-                persistCards()
-                previewVocabCard = card
+                savingKnowledgePointIDs.insert(pointId)
+
+                let placeholderCard = VocabularyCard(
+                    word: point.term,
+                    meaningZH: point.meaningZH,
+                    pronunciation: point.pronunciation ?? "",
+                    partOfSpeech: point.partOfSpeech ?? "",
+                    originalSentence: analysisResults[resultIndex].originalText,
+                    exampleSentence: "正在生成例句…",
+                    exampleTranslationZH: "",
+                    usageNote: point.usageNote,
+                    sourcePointId: point.id
+                )
+                previewVocabCard = placeholderCard
                 previewGrammarCard = nil
+                isCardPreviewLoadingExamples = true
                 showCardPreview = true
+
+                Task { @MainActor in
+                    defer { savingKnowledgePointIDs.remove(pointId) }
+                    let card = await createVocabularyCard(from: point, sentence: analysisResults[resultIndex].originalText)
+                    vocabularyCards.insert(card, at: 0)
+                    persistCards()
+                    previewVocabCard = card
+                    previewGrammarCard = nil
+                    isCardPreviewLoadingExamples = false
+                }
             } else if previousAction == .saved {
                 // Undo: remove the card that was generated from this point
                 removeVocabCardForPoint(pointId)
@@ -325,12 +361,31 @@ class AppState {
             persistKnowledgeMark(for: point, action: action)
 
             if action == .saved {
-                let card = createGrammarCard(from: point, sentence: analysisResults[resultIndex].originalText)
-                grammarCards.insert(card, at: 0)
-                persistCards()
-                previewGrammarCard = card
+                savingKnowledgePointIDs.insert(pointId)
+
+                let placeholderCard = GrammarCard(
+                    point: point.term,
+                    meaningZH: point.meaningZH,
+                    toneNote: point.toneNote ?? "",
+                    originalSentence: analysisResults[resultIndex].originalText,
+                    exampleSentences: [("正在生成例句…", "")],
+                    usageContext: point.usageNote,
+                    sourcePointId: point.id
+                )
+                previewGrammarCard = placeholderCard
                 previewVocabCard = nil
+                isCardPreviewLoadingExamples = true
                 showCardPreview = true
+
+                Task { @MainActor in
+                    defer { savingKnowledgePointIDs.remove(pointId) }
+                    let card = await createGrammarCard(from: point, sentence: analysisResults[resultIndex].originalText)
+                    grammarCards.insert(card, at: 0)
+                    persistCards()
+                    previewGrammarCard = card
+                    previewVocabCard = nil
+                    isCardPreviewLoadingExamples = false
+                }
             } else if previousAction == .saved {
                 // Undo: remove the card that was generated from this point
                 removeGrammarCardForPoint(pointId)
@@ -374,6 +429,7 @@ class AppState {
         isGeneratingReply = false
         replyGenerationError = nil
         myReplyCheckResults = []
+        savingKnowledgePointIDs = []
         feedbackThreads = [:]
         feedbackSendingForResultID = nil
         feedbackErrors = [:]
@@ -433,8 +489,21 @@ class AppState {
     }
 
     /// Create a VocabularyCard from a KnowledgePoint
-    private func createVocabularyCard(from point: KnowledgePoint, sentence: String) -> VocabularyCard {
-        let example = mockVocabExample(term: point.term, originalSentence: sentence)
+    private func createVocabularyCard(from point: KnowledgePoint, sentence: String) async -> VocabularyCard {
+        let example: (ko: String, zh: String)
+        do {
+            example = try await cardExampleService.vocabularyExample(term: point.term, originalSentence: sentence)
+        } catch {
+            #if DEBUG
+            DebugTelemetry.increment(.cardExampleFallbackTotal)
+            #endif
+            if let canned = MockData.vocabularyCards.first(where: { $0.word == point.term }) {
+                example = (canned.exampleSentence, canned.exampleTranslationZH)
+            } else {
+                example = (sentence, "包含「\(point.term)」的例句。")
+            }
+        }
+
         return VocabularyCard(
             word: point.term,
             meaningZH: point.meaningZH,
@@ -449,36 +518,32 @@ class AppState {
     }
 
     /// Create a GrammarCard from a KnowledgePoint
-    private func createGrammarCard(from point: KnowledgePoint, sentence: String) -> GrammarCard {
-        GrammarCard(
+    private func createGrammarCard(from point: KnowledgePoint, sentence: String) async -> GrammarCard {
+        let examples: [(ko: String, zh: String)]
+        do {
+            examples = try await cardExampleService.grammarExamples(point: point.term, originalSentence: sentence)
+        } catch {
+            #if DEBUG
+            DebugTelemetry.increment(.cardExampleFallbackTotal)
+            #endif
+            if let canned = MockData.grammarCards.first(where: { $0.point == point.term }) {
+                examples = canned.exampleSentences
+            } else {
+                examples = [(sentence, "包含「\(point.term)」的例句。")]
+            }
+        }
+
+        return GrammarCard(
             point: point.term,
             meaningZH: point.meaningZH,
             toneNote: point.toneNote ?? "",
             originalSentence: sentence,
-            exampleSentences: mockGrammarExamples(point: point.term, originalSentence: sentence),
+            exampleSentences: examples,
             usageContext: point.usageNote,
             sourcePointId: point.id
         )
     }
 
-    /// Mock vocabulary example generator. Reuses curated `MockData` examples when the term
-    /// is known; otherwise falls back to the source sentence and a generic meaning hint.
-    /// To be replaced by a real CardExampleService when AI integration lands.
-    private func mockVocabExample(term: String, originalSentence: String) -> (ko: String, zh: String) {
-        if let canned = MockData.vocabularyCards.first(where: { $0.word == term }) {
-            return (canned.exampleSentence, canned.exampleTranslationZH)
-        }
-        return (originalSentence, "包含「\(term)」的例句。")
-    }
-
-    /// Mock grammar example generator. Reuses curated `MockData` examples when the grammar
-    /// point is known; otherwise falls back to a single sample built from the source sentence.
-    private func mockGrammarExamples(point: String, originalSentence: String) -> [(ko: String, zh: String)] {
-        if let canned = MockData.grammarCards.first(where: { $0.point == point }) {
-            return canned.exampleSentences
-        }
-        return [(originalSentence, "包含「\(point)」的例句。")]
-    }
 
     /// Remove a vocabulary card that was generated from a specific knowledge point
     private func removeVocabCardForPoint(_ pointId: UUID) {

@@ -30,6 +30,9 @@ enum DebugTelemetry {
 
         case replySuggestionRequestTotal = "reply_suggestion.request_total"
         case replySuggestionFallbackTotal = "reply_suggestion.fallback_total"
+
+        case cardExampleRequestTotal = "card_example.request_total"
+        case cardExampleFallbackTotal = "card_example.fallback_total"
     }
 
     static func increment(_ counter: Counter) {

@@ -4,6 +4,7 @@ struct KnowledgePointView: View {
     let point: KnowledgePoint
     var onKnow: (() -> Void)?
     var onSkip: (() -> Void)?
+    var isGenerating: Bool = false
     var onSave: (() -> Void)?
     var onUndo: (() -> Void)?
 
@@ -121,7 +122,7 @@ struct KnowledgePointView: View {
                         .foregroundStyle(Color.inkMute)
                 }
                 Button(action: { onSave?() }) {
-                    Text("生成卡片")
+                    Text(isGenerating ? "生成中…" : "生成卡片")
                         .font(.system(size: 12, weight: .semibold))
                         .padding(.horizontal, 10)
                         .frame(height: 28)
@@ -129,6 +130,7 @@ struct KnowledgePointView: View {
                         .foregroundStyle(Color.pinkDeep)
                         .clipShape(Capsule())
                 }
+                .disabled(isGenerating)
             }
         case .open:
             // Three mutually exclusive actions:
@@ -159,15 +161,16 @@ struct KnowledgePointView: View {
                 Spacer()
 
                 Button(action: { onSave?() }) {
-                    Label("生成卡片", systemImage: "plus")
+                    Label(isGenerating ? "生成中…" : "生成卡片", systemImage: isGenerating ? "hourglass" : "plus")
                         .font(.system(size: 13, weight: .semibold))
                         .padding(.horizontal, 14)
                         .frame(height: 32)
-                        .background(Color.pink)
+                        .background(isGenerating ? Color(hex: "E5DFEE") : Color.pink)
                         .foregroundStyle(.white)
                         .clipShape(Capsule())
                         .shadow(color: Color.pink.opacity(0.45), radius: 6, y: 4)
                 }
+                .disabled(isGenerating)
             }
         }
     }

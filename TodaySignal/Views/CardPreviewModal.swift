@@ -3,6 +3,7 @@ import SwiftUI
 struct CardPreviewModal: View {
     var vocabCard: VocabularyCard?
     var grammarCard: GrammarCard?
+    var isLoadingExamples: Bool = false
     var onDismiss: () -> Void
     var onGoToLibrary: () -> Void
 
@@ -12,23 +13,30 @@ struct CardPreviewModal: View {
 
             ScrollView {
                 VStack(spacing: 0) {
-                    // Success bar
                     HStack(spacing: 8) {
-                        Image(systemName: "checkmark")
-                            .font(.system(size: 13, weight: .semibold))
-                            .foregroundStyle(.white)
-                            .frame(width: 22, height: 22)
-                            .background(Color.mint)
-                            .clipShape(Circle())
+                        if isLoadingExamples {
+                            ProgressView()
+                                .controlSize(.small)
+                            Text("卡片已保存，正在生成例句…")
+                                .font(.system(size: 13, weight: .semibold))
+                                .foregroundStyle(Color(hex: "3F6FB8"))
+                        } else {
+                            Image(systemName: "checkmark")
+                                .font(.system(size: 13, weight: .semibold))
+                                .foregroundStyle(.white)
+                                .frame(width: 22, height: 22)
+                                .background(Color.mint)
+                                .clipShape(Circle())
 
-                        Text("已保存到卡片库")
-                            .font(.system(size: 13, weight: .semibold))
-                            .foregroundStyle(Color(hex: "3F8F66"))
+                            Text("已保存到卡片库")
+                                .font(.system(size: 13, weight: .semibold))
+                                .foregroundStyle(Color(hex: "3F8F66"))
+                        }
                     }
                     .padding(.horizontal, 12)
                     .padding(.vertical, 8)
                     .frame(maxWidth: .infinity, alignment: .leading)
-                    .background(Color.bgMint)
+                    .background(isLoadingExamples ? Color.bgLavender : Color.bgMint)
                     .clipShape(RoundedRectangle(cornerRadius: 12))
                     .padding(.bottom, 16)
 
@@ -59,6 +67,7 @@ struct CardPreviewModal: View {
 #Preview {
     CardPreviewModal(
         vocabCard: MockData.vocabularyCards[0],
+        isLoadingExamples: true,
         onDismiss: {},
         onGoToLibrary: {}
     )

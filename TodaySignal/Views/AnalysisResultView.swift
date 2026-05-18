@@ -48,6 +48,9 @@ struct AnalysisResultView: View {
                                 result: result,
                                 idolSide: appState.idolSide,
                                 isRetrying: appState.retryingResultIDs.contains(result.id),
+                                isSavingKnowledgePoint: { pointID in
+                                    appState.savingKnowledgePointIDs.contains(pointID)
+                                },
                                 onRetryFailed: {
                                     Task {
                                         await appState.retryFailedResult(resultID: result.id)
@@ -134,9 +137,14 @@ struct AnalysisResultView: View {
             CardPreviewModal(
                 vocabCard: appState.previewVocabCard,
                 grammarCard: appState.previewGrammarCard,
-                onDismiss: { appState.showCardPreview = false },
+                isLoadingExamples: appState.isCardPreviewLoadingExamples,
+                onDismiss: {
+                    appState.showCardPreview = false
+                    appState.isCardPreviewLoadingExamples = false
+                },
                 onGoToLibrary: {
                     appState.showCardPreview = false
+                    appState.isCardPreviewLoadingExamples = false
                     onDone()
                 }
             )
@@ -534,6 +542,7 @@ struct AnalysisBubbleCardView: View {
     let result: AnalysisResult
     var idolSide: BubbleSide = .left
     var isRetrying: Bool = false
+    var isSavingKnowledgePoint: (UUID) -> Bool = { _ in false }
     var onRetryFailed: (() -> Void)?
     var onKnowledgeAction: (UUID, KnowledgeAction) -> Void
     var onShowCardPreview: (LearningCardType) -> Void
@@ -655,6 +664,7 @@ struct AnalysisBubbleCardView: View {
                         point: point,
                         onKnow: { onKnowledgeAction(point.id, .known) },
                         onSkip: { onKnowledgeAction(point.id, .dismissed) },
+                        isGenerating: isSavingKnowledgePoint(point.id),
                         onSave: { onKnowledgeAction(point.id, .saved) },
                         onUndo: { onKnowledgeAction(point.id, .open) }
                     )
@@ -676,6 +686,7 @@ struct AnalysisBubbleCardView: View {
                         point: point,
                         onKnow: { onKnowledgeAction(point.id, .known) },
                         onSkip: { onKnowledgeAction(point.id, .dismissed) },
+                        isGenerating: isSavingKnowledgePoint(point.id),
                         onSave: { onKnowledgeAction(point.id, .saved) },
                         onUndo: { onKnowledgeAction(point.id, .open) }
                     )
