@@ -30,6 +30,10 @@ struct MainTabView: View {
                         pasteTextErrorMessage = nil
                         pastedTextInput = ""
                         showPasteTextSheet = true
+                    },
+                    onQuickReply: {
+                        appState.prepareReplyContextFromHomeEntry()
+                        appState.navigationPath.append(AnalysisRoute.replySuggestion)
                     }
                 )
                 .navigationBarHidden(true)
@@ -104,6 +108,8 @@ struct MainTabView: View {
                                 appState.navigateToLibrary()
                             }
                         )
+                    case .replySuggestion:
+                        ReplySuggestionView()
                     }
                 }
             }

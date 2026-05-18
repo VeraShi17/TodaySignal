@@ -27,7 +27,7 @@ struct TextConfirmationView: View {
                             .foregroundStyle(Color.pinkDeep)
                             .padding(.top, 1)
 
-                        Text("请检查 OCR 识别结果。你可以修改、删除气泡，或标记哪一侧是对方。")
+                        Text("请确认 OCR 文字。点击 IDOL 气泡可勾选你想回复的消息。")
                             .font(.system(size: 12.5))
                             .foregroundStyle(Color(hex: "7A4A55"))
                             .lineSpacing(4)
@@ -41,21 +41,7 @@ struct TextConfirmationView: View {
                     // Chat bubbles
                     VStack(spacing: 10) {
                         ForEach(appState.chatBubbles) { bubble in
-                            ChatBubbleView(
-                                bubble: bubble,
-                                idolSide: appState.idolSide,
-                                showEditControls: !appState.isAnalyzing,
-                                onEdit: {
-                                    guard !appState.isAnalyzing else { return }
-                                    beginEditing(bubble: bubble)
-                                },
-                                onDelete: {
-                                    guard !appState.isAnalyzing else { return }
-                                    withAnimation {
-                                        appState.chatBubbles.removeAll { $0.id == bubble.id }
-                                    }
-                                }
-                            )
+                            bubbleRow(bubble: bubble)
                         }
                     }
                     .padding(.horizontal, 16)
@@ -108,41 +94,46 @@ struct TextConfirmationView: View {
             VStack(spacing: 0) {
                 Divider()
 
-                VStack(alignment: .leading, spacing: 14) {
-                    Text("哪一侧是 IDOL / 对方？")
-                        .font(.system(size: 12.5, weight: .bold))
-                        .foregroundStyle(Color.ink2)
-                        .tracking(0.4)
+                VStack(alignment: .leading, spacing: 12) {
+                    // Side selector row
+                    HStack {
+                        Text("IDOL / 对方在")
+                            .font(.system(size: 11.5, weight: .bold))
+                            .foregroundStyle(Color.ink2)
+                            .tracking(0.4)
 
-                    // Side selector
-                    HStack(spacing: 0) {
-                        ForEach([BubbleSide.left, .right], id: \.self) { side in
-                            let isSelected = side == appState.idolSide
-                            Button(action: {
-                                guard !appState.isAnalyzing else { return }
-                                withAnimation(.easeInOut(duration: 0.2)) { appState.idolSide = side }
-                            }) {
-                                HStack(spacing: 6) {
-                                    Text(side == .left ? "← 左侧" : "右侧 →")
-                                        .font(.system(size: 14, weight: .semibold))
-                                    if isSelected {
-                                        Text("IDOL")
-                                            .font(.system(size: 11, weight: .medium))
-                                            .foregroundStyle(Color.pink)
-                                    }
-                                }
-                                .frame(maxWidth: .infinity)
-                                .frame(height: 40)
-                                .background(isSelected ? .white : .clear)
-                                .foregroundStyle(isSelected ? Color.pinkDeep : Color.inkMute)
-                                .clipShape(RoundedRectangle(cornerRadius: 10))
-                                .shadow(color: isSelected ? Color(hex: "3C2832").opacity(0.06) : .clear, radius: 4, y: 2)
+                        Spacer()
+
+                        sideSelectorPill
+                    }
+
+                    if appState.chatBubbles.count > 12 {
+                        Text("这张截图内容有点多，解析可能会变慢。建议裁剪成 10 条以内或分批上传。")
+                            .font(.system(size: 12.5))
+                            .foregroundStyle(Color(hex: "B36A3D"))
+                            .padding(.horizontal, 12)
+                            .padding(.vertical, 10)
+                            .background(Color(hex: "FFF4EA"))
+                            .clipShape(RoundedRectangle(cornerRadius: 12))
+                    }
+
+                    if appState.hasMySideBubbles() {
+                        Toggle(isOn: $appState.checkMyReplyEnabled) {
+                            VStack(alignment: .leading, spacing: 2) {
+                                Text("同时检查我的回复")
+                                    .font(.system(size: 13.5, weight: .semibold))
+                                    .foregroundStyle(Color.ink2)
+                                Text("检查你已发出的韩语是否自然")
+                                    .font(.system(size: 11.5))
+                                    .foregroundStyle(Color.inkMute)
                             }
                         }
+                        .padding(.horizontal, 12)
+                        .padding(.vertical, 10)
+                        .background(Color.bgMint)
+                        .clipShape(RoundedRectangle(cornerRadius: 12))
+                        .toggleStyle(.switch)
                     }
-                    .padding(4)
-                    .background(Color(hex: "F2EAEC"))
-                    .clipShape(RoundedRectangle(cornerRadius: 14))
 
                     if appState.isAnalyzing {
                         HStack(spacing: 10) {
@@ -173,10 +164,22 @@ struct TextConfirmationView: View {
                         .clipShape(RoundedRectangle(cornerRadius: 12))
                     }
 
+                    if appState.selectedReplyBubbleIDs.isEmpty {
+                        Text("点击 IDOL 气泡可勾选 · 生成回复建议前需先选择")
+                            .font(.system(size: 11.5))
+                            .foregroundStyle(Color.inkMute)
+                            .frame(maxWidth: .infinity, alignment: .center)
+                    } else {
+                        Text("✓ 已选 \(appState.selectedReplyBubbleIDs.count) 条 IDOL 消息")
+                            .font(.system(size: 12, weight: .semibold))
+                            .foregroundStyle(Color.pinkDeep)
+                            .frame(maxWidth: .infinity, alignment: .center)
+                    }
+
                     // Action buttons
                     HStack(spacing: 10) {
                         PrimaryButton(
-                            title: appState.isAnalyzing ? "解析中…" : "开始解析",
+                            title: appState.isAnalyzing ? "解析中…" : "学习解析",
                             icon: "sparkle",
                             isDisabled: appState.isAnalyzing || appState.chatBubbles.isEmpty,
                             action: {
@@ -184,13 +187,34 @@ struct TextConfirmationView: View {
                                 onAnalyze()
                             }
                         )
+                        .frame(maxWidth: .infinity)
 
-                        SecondaryButton(title: "重新上传", isFullWidth: false, action: onBack)
-                            .disabled(appState.isAnalyzing)
+                        Button {
+                            guard !appState.isAnalyzing else { return }
+                            if appState.prepareReplyContextFromSelection() {
+                                appState.navigationPath.append(AnalysisRoute.replySuggestion)
+                            } else {
+                                appState.analysisErrorMessage = "请先选择想回复的消息。"
+                            }
+                        } label: {
+                            HStack(spacing: 6) {
+                                Image(systemName: "bubble.left.and.bubble.right")
+                                    .font(.system(size: 14, weight: .semibold))
+                                Text("生成回复建议")
+                                    .font(.system(size: 14, weight: .semibold))
+                            }
+                            .frame(maxWidth: .infinity)
+                            .frame(height: 56)
+                            .background(appState.selectedReplyBubbleIDs.isEmpty ? Color(hex: "E5DFEE") : Color(hex: "7860B3"))
+                            .foregroundStyle(.white)
+                            .clipShape(RoundedRectangle(cornerRadius: 22))
+                            .shadow(color: appState.selectedReplyBubbleIDs.isEmpty ? .clear : Color(hex: "7860B3").opacity(0.45), radius: 8, y: 4)
+                        }
+                        .disabled(appState.isAnalyzing)
                     }
                 }
                 .padding(.horizontal, 22)
-                .padding(.top, 16)
+                .padding(.top, 14)
                 .padding(.bottom, 30)
                 .background(
                     Color.bgPage.opacity(0.97)
@@ -224,6 +248,113 @@ struct TextConfirmationView: View {
             insertSheet
                 .presentationDetents([.medium])
         }
+    }
+
+    @ViewBuilder
+    private func bubbleRow(bubble: ChatBubble) -> some View {
+        let isSelectable = bubble.type == .text && bubble.side == appState.idolSide
+        let isSelected = appState.selectedReplyBubbleIDs.contains(bubble.id)
+
+        HStack(alignment: .top, spacing: 8) {
+            if isSelectable && appState.idolSide == .left {
+                selectionCheckbox(selected: isSelected) {
+                    toggleSelection(bubble.id)
+                }
+                .padding(.top, 18)
+            }
+
+            ChatBubbleView(
+                bubble: bubble,
+                idolSide: appState.idolSide,
+                showEditControls: !appState.isAnalyzing,
+                onEdit: {
+                    guard !appState.isAnalyzing else { return }
+                    beginEditing(bubble: bubble)
+                },
+                onDelete: {
+                    guard !appState.isAnalyzing else { return }
+                    withAnimation {
+                        appState.chatBubbles.removeAll { $0.id == bubble.id }
+                        appState.selectedReplyBubbleIDs.remove(bubble.id)
+                    }
+                }
+            )
+            .contentShape(Rectangle())
+            .onTapGesture {
+                guard isSelectable else { return }
+                toggleSelection(bubble.id)
+            }
+
+            if isSelectable && appState.idolSide == .right {
+                selectionCheckbox(selected: isSelected) {
+                    toggleSelection(bubble.id)
+                }
+                .padding(.top, 18)
+            }
+        }
+        .padding(.vertical, 4)
+        .padding(.horizontal, isSelected ? 6 : 0)
+        .background(
+            RoundedRectangle(cornerRadius: 14)
+                .fill(isSelected ? Color.pinkTint.opacity(0.32) : .clear)
+        )
+        .animation(.easeInOut(duration: 0.15), value: isSelected)
+    }
+
+    private func toggleSelection(_ bubbleID: UUID) {
+        guard !appState.isAnalyzing else { return }
+        withAnimation(.easeInOut(duration: 0.15)) {
+            appState.toggleReplyBubbleSelection(bubbleID)
+        }
+    }
+
+    @ViewBuilder
+    private func selectionCheckbox(selected: Bool, action: @escaping () -> Void) -> some View {
+        Button(action: action) {
+            ZStack {
+                RoundedRectangle(cornerRadius: 7)
+                    .fill(selected ? Color.pink : .white)
+                    .frame(width: 22, height: 22)
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 7)
+                            .stroke(selected ? Color.pink : Color.line2, lineWidth: 1.5)
+                    )
+                    .shadow(color: selected ? Color.pink.opacity(0.4) : .clear, radius: 4, y: 1)
+
+                if selected {
+                    Image(systemName: "checkmark")
+                        .font(.system(size: 12, weight: .bold))
+                        .foregroundStyle(.white)
+                }
+            }
+        }
+        .buttonStyle(.plain)
+        .disabled(appState.isAnalyzing)
+    }
+
+    private var sideSelectorPill: some View {
+        HStack(spacing: 2) {
+            ForEach([BubbleSide.left, .right], id: \.self) { side in
+                let isSelected = side == appState.idolSide
+                Button {
+                    guard !appState.isAnalyzing else { return }
+                    withAnimation(.easeInOut(duration: 0.2)) { appState.idolSide = side }
+                } label: {
+                    Text(side == .left ? "左侧" : "右侧")
+                        .font(.system(size: 12.5, weight: .semibold))
+                        .foregroundStyle(isSelected ? Color.pinkDeep : Color.inkMute)
+                        .padding(.horizontal, 14)
+                        .frame(height: 28)
+                        .background(isSelected ? Color.white : .clear)
+                        .clipShape(RoundedRectangle(cornerRadius: 9))
+                        .shadow(color: isSelected ? Color(hex: "3C2832").opacity(0.08) : .clear, radius: 4, y: 1)
+                }
+                .buttonStyle(.plain)
+            }
+        }
+        .padding(3)
+        .background(Color(hex: "F2EAEC"))
+        .clipShape(RoundedRectangle(cornerRadius: 12))
     }
 
     private func beginEditing(bubble: ChatBubble) {

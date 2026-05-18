@@ -4,6 +4,7 @@ struct CardLibraryView: View {
     @Environment(AppState.self) private var appState
     @State private var selectedTab: CardTab = .vocabulary
     @State private var expandedCardId: UUID?
+    @State private var expandedGrammarCardId: UUID?
 
     enum CardTab: String, CaseIterable {
         case vocabulary = "生词"
@@ -89,6 +90,12 @@ struct CardLibraryView: View {
                                 ForEach(appState.grammarCards) { card in
                                     GrammarCardRow(
                                         card: card,
+                                        isExpanded: expandedGrammarCardId == card.id,
+                                        onToggle: {
+                                            withAnimation(.easeInOut(duration: 0.2)) {
+                                                expandedGrammarCardId = expandedGrammarCardId == card.id ? nil : card.id
+                                            }
+                                        },
                                         onDelete: {
                                             withAnimation {
                                                 appState.deleteGrammarCard(card.id)
@@ -241,46 +248,89 @@ struct VocabCardRow: View {
 
 struct GrammarCardRow: View {
     let card: GrammarCard
+    let isExpanded: Bool
+    var onToggle: () -> Void
     var onDelete: () -> Void
 
     var body: some View {
-        HStack(alignment: .center, spacing: 12) {
-            VStack(alignment: .leading, spacing: 4) {
-                HStack(alignment: .firstTextBaseline, spacing: 8) {
-                    Text(card.point)
-                        .font(.system(size: 22, weight: .bold))
-                        .foregroundStyle(Color.ink)
-                    TonePillView(text: "语尾", kind: .coral)
-                }
-                Text(card.meaningZH)
-                    .font(.system(size: 14.5))
-                    .foregroundStyle(Color.ink2)
+        VStack(alignment: .leading, spacing: 0) {
+            Button(action: onToggle) {
+                HStack(alignment: .center, spacing: 12) {
+                    VStack(alignment: .leading, spacing: 4) {
+                        HStack(alignment: .firstTextBaseline, spacing: 8) {
+                            Text(card.point)
+                                .font(.system(size: 22, weight: .bold))
+                                .foregroundStyle(Color.ink)
+                            TonePillView(text: "语法", kind: .coral)
+                        }
+                        Text(card.meaningZH)
+                            .font(.system(size: 14.5))
+                            .foregroundStyle(Color.ink2)
 
-                Text(card.toneNote)
-                    .font(.system(size: 12))
-                    .foregroundStyle(Color.inkMute)
-                    .italic()
-                    .padding(.top, 2)
+                        Text(card.toneNote)
+                            .font(.system(size: 12))
+                            .foregroundStyle(Color.inkMute)
+                            .italic()
+                            .padding(.top, 2)
 
-                HStack(spacing: 6) {
-                    Image(systemName: "bubble.left")
-                        .font(.system(size: 12))
-                        .foregroundStyle(Color.inkMute)
-                    Text(card.originalSentence)
-                        .font(.system(size: 12.5))
-                        .foregroundStyle(Color.inkMute)
-                        .lineLimit(1)
+                        HStack(spacing: 6) {
+                            Image(systemName: "bubble.left")
+                                .font(.system(size: 12))
+                                .foregroundStyle(Color.inkMute)
+                            Text(card.originalSentence)
+                                .font(.system(size: 12.5))
+                                .foregroundStyle(Color.inkMute)
+                                .lineLimit(1)
+                        }
+                        .padding(.top, 4)
+                    }
+
+                    Spacer()
+
+                    Button(action: onDelete) {
+                        Image(systemName: "trash")
+                            .font(.system(size: 14))
+                            .foregroundStyle(Color.inkFaint)
+                            .frame(width: 30, height: 30)
+                    }
                 }
-                .padding(.top, 4)
             }
+            .buttonStyle(.plain)
 
-            Spacer()
+            if isExpanded {
+                VStack(alignment: .leading, spacing: 0) {
+                    Divider()
+                        .padding(.vertical, 14)
 
-            Button(action: onDelete) {
-                Image(systemName: "trash")
-                    .font(.system(size: 14))
-                    .foregroundStyle(Color.inkFaint)
-                    .frame(width: 30, height: 30)
+                    Text("AI 例句")
+                        .font(.system(size: 10.5, weight: .bold))
+                        .foregroundStyle(Color.inkMute)
+                        .tracking(0.6)
+
+                    ForEach(Array(card.exampleSentences.enumerated()), id: \.offset) { _, example in
+                        Text(example.ko)
+                            .font(.system(size: 14.5, weight: .medium))
+                            .foregroundStyle(Color.ink)
+                            .padding(.top, 4)
+                        Text(example.zh)
+                            .font(.system(size: 12.5))
+                            .foregroundStyle(Color.inkMute)
+                            .padding(.top, 2)
+                            .padding(.bottom, 6)
+                    }
+
+                    Text("适合关系 / 场景")
+                        .font(.system(size: 10.5, weight: .bold))
+                        .foregroundStyle(Color.inkMute)
+                        .tracking(0.6)
+                        .padding(.top, 8)
+
+                    Text(card.usageContext)
+                        .font(.system(size: 13))
+                        .foregroundStyle(Color.ink2)
+                        .lineSpacing(4)
+                        .padding(.top, 4)
+                }
             }
         }
         .padding(14)
@@ -288,8 +338,9 @@ struct GrammarCardRow: View {
         .clipShape(RoundedRectangle(cornerRadius: 18))
         .overlay(
             RoundedRectangle(cornerRadius: 18)
-                .stroke(Color.line, lineWidth: 1)
+                .stroke(isExpanded ? Color.pinkSoft : Color.line, lineWidth: 1)
         )
+        .shadow(color: isExpanded ? Color.pink.opacity(0.25) : .clear, radius: 14, y: 10)
     }
 }
 

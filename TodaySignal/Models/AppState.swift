@@ -17,6 +17,15 @@ class AppState {
 
     var chatBubbles: [ChatBubble] = MockData.chatBubbles
     var idolSide: BubbleSide = .left
+    var checkMyReplyEnabled = true
+    var selectedReplyBubbleIDs: Set<UUID> = []
+
+    var replyContextBubbles: [ChatBubble] = []
+    var replySuggestions: [ReplySuggestion] = []
+    var selectedReplyTone: ReplyTone = .natural
+    var replyIntentZh = ""
+    var isGeneratingReply = false
+    var replyGenerationError: String?
 
     // MARK: - Analysis Results
 
@@ -25,7 +34,13 @@ class AppState {
     var analysisErrorMessage: String?
     var retryingResultIDs: Set<UUID> = []
 
+    var myReplyCheckResult: ReplyCheckResult?
+    var feedbackMessages: [FeedbackMessage] = []
+    var isSendingFeedback = false
+    var feedbackErrorMessage: String?
+
     private let aiAnalysisService: AIAnalysisServicing
+    private let replySuggestionService: ReplySuggestionServicing
     private let cardStorageService: CardStorageService
     private var persistedKnowledgeMarks: [String: KnowledgeAction]
 
@@ -37,9 +52,11 @@ class AppState {
 
     init(
         aiAnalysisService: AIAnalysisServicing = AIAnalysisServiceFactory.makeDefaultService(),
+        replySuggestionService: ReplySuggestionServicing = ReplySuggestionServiceFactory.makeDefaultService(),
         cardStorageService: CardStorageService = .shared
     ) {
         self.aiAnalysisService = aiAnalysisService
+        self.replySuggestionService = replySuggestionService
         self.cardStorageService = cardStorageService
         self.persistedKnowledgeMarks = cardStorageService.loadKnowledgeMarks()
 
@@ -87,6 +104,8 @@ class AppState {
             let merged = mergeWithFailurePlaceholders(results: results, request: request)
             let withMarks = applyPersistedKnowledgeMarks(to: merged)
             analysisResults = deduplicateKnowledgePointsGlobally(in: withMarks)
+            loadMockMyReplyCheckIfNeeded()
+            feedbackMessages = MockData.v1FeedbackMock
             return true
         } catch {
             if let knownError = error as? AIAnalysisError {
@@ -104,6 +123,84 @@ class AppState {
 
     func clearAnalysisError() {
         analysisErrorMessage = nil
+    }
+
+    func hasMySideBubbles() -> Bool {
+        chatBubbles.contains { $0.side != idolSide }
+    }
+
+    func toggleReplyBubbleSelection(_ bubbleID: UUID) {
+        if selectedReplyBubbleIDs.contains(bubbleID) {
+            selectedReplyBubbleIDs.remove(bubbleID)
+        } else {
+            selectedReplyBubbleIDs.insert(bubbleID)
+        }
+    }
+
+    func prepareReplyContextFromSelection() -> Bool {
+        let selected = chatBubbles.filter { selectedReplyBubbleIDs.contains($0.id) }
+        guard !selected.isEmpty else { return false }
+        replyContextBubbles = selected
+        replySuggestions = []
+        replyIntentZh = ""
+        selectedReplyTone = .natural
+        return true
+    }
+
+    func prepareReplyContextFromHomeEntry() {
+        replyContextBubbles = []
+        replySuggestions = []
+        replyIntentZh = ""
+        selectedReplyTone = .natural
+    }
+
+    @MainActor
+    func generateReplySuggestions() async {
+        guard !isGeneratingReply else { return }
+        isGeneratingReply = true
+        replyGenerationError = nil
+        defer { isGeneratingReply = false }
+
+        do {
+            replySuggestions = try await replySuggestionService.generateReplies(
+                contextBubbles: replyContextBubbles,
+                intentZh: replyIntentZh,
+                tone: selectedReplyTone
+            )
+        } catch let error as ReplySuggestionError {
+            if let debug = error.debugMessage {
+                replyGenerationError = "\(error.errorDescription ?? "回复生成失败")\n\n调试信息：\(debug)"
+            } else {
+                replyGenerationError = error.errorDescription ?? "回复生成失败，请稍后重试。"
+            }
+            replySuggestions = []
+        } catch {
+            replyGenerationError = "回复生成失败，请稍后重试。"
+            replySuggestions = []
+        }
+    }
+
+    func loadMockMyReplyCheckIfNeeded() {
+        guard checkMyReplyEnabled && hasMySideBubbles() else {
+            myReplyCheckResult = nil
+            return
+        }
+
+        myReplyCheckResult = Bool.random() ? MockData.v1ReplyCheckNatural : MockData.v1ReplyCheckNeedsImprovement
+    }
+
+    @MainActor
+    func sendMockFeedback(question: String) async {
+        let trimmed = question.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty, !isSendingFeedback else { return }
+
+        feedbackErrorMessage = nil
+        isSendingFeedback = true
+        feedbackMessages.append(FeedbackMessage(isUser: true, text: trimmed))
+
+        try? await Task.sleep(for: .milliseconds(450))
+        feedbackMessages.append(FeedbackMessage(isUser: false, text: "这是 V1 mock 回复：我会结合当前解析结果继续解释这个表达。"))
+        isSendingFeedback = false
     }
 
     @MainActor
@@ -132,8 +229,7 @@ class AppState {
                     translationZH: first.translationZH,
                     toneLabels: first.toneLabels,
                     vocabulary: first.vocabulary,
-                    grammarPoints: first.grammarPoints,
-                    isUserReply: false
+                    grammarPoints: first.grammarPoints
                 )
             ])[0]
             analysisResults = deduplicateKnowledgePointsGlobally(in: analysisResults)
@@ -217,6 +313,18 @@ class AppState {
         analysisErrorMessage = nil
         isAnalyzing = false
         retryingResultIDs = []
+        checkMyReplyEnabled = true
+        selectedReplyBubbleIDs = []
+        replyContextBubbles = []
+        replySuggestions = []
+        selectedReplyTone = .natural
+        replyIntentZh = ""
+        isGeneratingReply = false
+        replyGenerationError = nil
+        myReplyCheckResult = nil
+        feedbackMessages = []
+        isSendingFeedback = false
+        feedbackErrorMessage = nil
         navigationPath = NavigationPath()
         selectedTab = .analysis
     }
@@ -268,7 +376,6 @@ class AppState {
             toneLabels: [],
             vocabulary: [],
             grammarPoints: [],
-            isUserReply: false,
             failureMessage: "该条消息解析失败，可单独重试。"
         )
     }
@@ -409,4 +516,5 @@ enum AnalysisRoute: Hashable {
     case textConfirmation
     case analysisLoading
     case analysisResult
+    case replySuggestion
 }

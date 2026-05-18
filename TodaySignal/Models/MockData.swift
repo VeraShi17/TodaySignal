@@ -57,6 +57,19 @@ enum LearningCardType: String, Codable {
     case grammar
 }
 
+enum ReplyTone: String, Codable, CaseIterable {
+    case natural = "自然"
+    case cute = "可爱"
+    case polite = "礼貌"
+    case friendly = "朋友感"
+    case subtleFlirty = "暧昧感"
+}
+
+enum ReplyCheckStatus: String, Codable {
+    case natural
+    case needsImprovement
+}
+
 // MARK: - Models
 
 struct ChatBubble: Identifiable {
@@ -109,15 +122,9 @@ struct AnalysisResult: Identifiable {
     let toneLabels: [ToneLabel]
     var vocabulary: [KnowledgePoint]
     var grammarPoints: [KnowledgePoint]
-    let isUserReply: Bool
-    // For user reply feedback
-    let replyStatus: ReplyStatus?
-    let replyIssue: String?
-    let suggestedReply: String?
-    let suggestedReplyZH: String?
     let failureMessage: String?
 
-    init(id: UUID = UUID(), bubbleID: UUID = UUID(), originalText: String, translationZH: String, toneLabels: [ToneLabel], vocabulary: [KnowledgePoint] = [], grammarPoints: [KnowledgePoint] = [], isUserReply: Bool = false, replyStatus: ReplyStatus? = nil, replyIssue: String? = nil, suggestedReply: String? = nil, suggestedReplyZH: String? = nil, failureMessage: String? = nil) {
+    init(id: UUID = UUID(), bubbleID: UUID = UUID(), originalText: String, translationZH: String, toneLabels: [ToneLabel], vocabulary: [KnowledgePoint] = [], grammarPoints: [KnowledgePoint] = [], failureMessage: String? = nil) {
         self.id = id
         self.bubbleID = bubbleID
         self.originalText = originalText
@@ -125,18 +132,8 @@ struct AnalysisResult: Identifiable {
         self.toneLabels = toneLabels
         self.vocabulary = vocabulary
         self.grammarPoints = grammarPoints
-        self.isUserReply = isUserReply
-        self.replyStatus = replyStatus
-        self.replyIssue = replyIssue
-        self.suggestedReply = suggestedReply
-        self.suggestedReplyZH = suggestedReplyZH
         self.failureMessage = failureMessage
     }
-}
-
-enum ReplyStatus: String, Codable {
-    case natural
-    case needsImprovement = "needs_improvement"
 }
 
 struct VocabularyCard: Identifiable {
@@ -187,6 +184,56 @@ struct GrammarCard: Identifiable {
     }
 }
 
+struct ReplySuggestion: Identifiable {
+    let id: UUID
+    let replyKo: String
+    let replyZh: String
+    let tone: ReplyTone
+    let noteZh: String
+
+    init(id: UUID = UUID(), replyKo: String, replyZh: String, tone: ReplyTone, noteZh: String) {
+        self.id = id
+        self.replyKo = replyKo
+        self.replyZh = replyZh
+        self.tone = tone
+        self.noteZh = noteZh
+    }
+}
+
+struct ReplyCheckResult: Identifiable {
+    let id: UUID
+    let bubbleID: UUID?
+    let originalReply: String
+    let status: ReplyCheckStatus
+    let feedbackZh: String
+    let issueZh: String?
+    let suggestedReplyKo: String?
+    let suggestedReplyZh: String?
+
+    init(id: UUID = UUID(), bubbleID: UUID?, originalReply: String, status: ReplyCheckStatus, feedbackZh: String, issueZh: String?, suggestedReplyKo: String?, suggestedReplyZh: String?) {
+        self.id = id
+        self.bubbleID = bubbleID
+        self.originalReply = originalReply
+        self.status = status
+        self.feedbackZh = feedbackZh
+        self.issueZh = issueZh
+        self.suggestedReplyKo = suggestedReplyKo
+        self.suggestedReplyZh = suggestedReplyZh
+    }
+}
+
+struct FeedbackMessage: Identifiable {
+    let id: UUID
+    let isUser: Bool
+    let text: String
+
+    init(id: UUID = UUID(), isUser: Bool, text: String) {
+        self.id = id
+        self.isUser = isUser
+        self.text = text
+    }
+}
+
 // MARK: - Mock Data
 
 struct MockData {
@@ -212,16 +259,6 @@ struct MockData {
             grammarPoints: [
                 KnowledgePoint(type: .grammar, term: "-해?", meaningZH: "做……吗？", toneNote: "平语疑问，语气自然亲近", usageNote: "适合朋友、熟人、亲近关系中使用。"),
             ]
-        ),
-        AnalysisResult(
-            originalText: "응원할게",
-            translationZH: "我会为你加油的",
-            toneLabels: [.polite],
-            isUserReply: true,
-            replyStatus: .needsImprovement,
-            replyIssue: "意思没错，但在粉丝回复 idol 的语境里有点直接。",
-            suggestedReply: "항상 응원하고 있어요!",
-            suggestedReplyZH: "我一直都在为你应援！"
         ),
         AnalysisResult(
             originalText: "이거 봤어? 너무 귀엽잖아ㅋㅋ",
@@ -256,5 +293,36 @@ struct MockData {
         (tag: "亲近随意", preview: "오늘 뭐해? ㅋㅋ", meta: "今天 · 3 个新卡片", pillKind: .pink),
         (tag: "可爱 / 撒娇", preview: "나 보고 싶었어?", meta: "昨天 · 2 个新卡片", pillKind: .coral),
         (tag: "安慰 / 关心", preview: "괜찮아, 무리하지 마", meta: "5月10日 · 1 个新卡片", pillKind: .lavender),
+    ]
+
+    static let v1ReplySuggestions: [ReplySuggestion] = [
+        ReplySuggestion(replyKo: "오늘도 고생 많았어. 따뜻한 거 꼭 챙겨 먹어♡", replyZh: "今天也辛苦了，记得吃点热的♡", tone: .natural, noteZh: "自然温柔，适合日常关心。"),
+        ReplySuggestion(replyKo: "헉 너무 귀엽다… 나 또 심장 아파 ㅋㅋ", replyZh: "啊太可爱了…我又心动了哈哈", tone: .cute, noteZh: "可爱+轻松玩笑感。"),
+        ReplySuggestion(replyKo: "오늘도 덕분에 힘났어요. 푹 쉬어요!", replyZh: "今天也因为你获得力量了。好好休息！", tone: .polite, noteZh: "更礼貌，适合偏正式粉丝语气。")
+    ]
+
+    static let v1ReplyCheckNatural = ReplyCheckResult(
+        bubbleID: nil,
+        originalReply: "오늘도 수고했어요!",
+        status: .natural,
+        feedbackZh: "这句表达自然，没有明显问题。语气礼貌、温柔，适合粉丝回复 idol。",
+        issueZh: nil,
+        suggestedReplyKo: nil,
+        suggestedReplyZh: nil
+    )
+
+    static let v1ReplyCheckNeedsImprovement = ReplyCheckResult(
+        bubbleID: nil,
+        originalReply: "나는 너를 많이 좋아해요",
+        status: .needsImprovement,
+        feedbackZh: "这句可以更自然一点。意思能理解，但语气稍微有点直接。",
+        issueZh: "建议换成更常见的粉丝表达，既自然又不冒犯边界。",
+        suggestedReplyKo: "항상 응원하고 있어요!",
+        suggestedReplyZh: "我一直都在为你应援！"
+    )
+
+    static let v1FeedbackMock: [FeedbackMessage] = [
+        FeedbackMessage(isUser: true, text: "这里为什么用 -는데？"),
+        FeedbackMessage(isUser: false, text: "这里的 -는데 有承接语气，先铺垫背景再引出后文，所以语气会更自然。")
     ]
 }

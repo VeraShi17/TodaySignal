@@ -193,8 +193,7 @@ struct OpenAIAnalysisService: AIAnalysisServicing {
                         translationZH: item.translationZH,
                         toneLabels: mapToneLabels(item.toneLabels),
                         vocabulary: deduplicatedKnowledgePoints(vocabPoints),
-                        grammarPoints: deduplicatedKnowledgePoints(grammarPoints),
-                        isUserReply: false
+                        grammarPoints: deduplicatedKnowledgePoints(grammarPoints)
                     )
                 }
         } catch let error as AIAnalysisError {
