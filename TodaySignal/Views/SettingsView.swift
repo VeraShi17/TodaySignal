@@ -244,6 +244,7 @@ struct SettingsView: View {
             .feedbackFallbackTotal,
             .feedbackEmptyAnswer,
             .feedbackAnswerTooLong,
+            .feedbackTooGeneric,
             .replySuggestionRequestTotal,
             .replySuggestionFallbackTotal,
             .replyItemCountMismatch,
@@ -312,6 +313,8 @@ struct SettingsView: View {
             return "追问：空回答降级"
         case .feedbackAnswerTooLong:
             return "追问：回答过长截断"
+        case .feedbackTooGeneric:
+            return "追问：回答过泛降级"
         case .replySuggestionRequestTotal:
             return "回复建议：总请求数"
         case .replySuggestionFallbackTotal:

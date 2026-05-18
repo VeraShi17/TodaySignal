@@ -7,6 +7,7 @@ enum DebugTelemetry {
     enum Counter: String, CaseIterable {
         case feedbackEmptyAnswer = "feedback.empty_answer"
         case feedbackAnswerTooLong = "feedback.answer_too_long"
+        case feedbackTooGeneric = "feedback.too_generic"
 
         case replyItemCountMismatch = "reply.item_count_mismatch"
         case replyEmptyField = "reply.empty_field"

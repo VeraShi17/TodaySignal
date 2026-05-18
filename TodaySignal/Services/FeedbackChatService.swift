@@ -165,6 +165,12 @@ struct OpenAIFeedbackChatService: FeedbackChatServicing {
                 DebugTelemetry.increment(.feedbackFallbackTotal)
                 DebugTelemetry.increment(.feedbackAnswerTooLong)
                 #endif
+            case .tooGeneric:
+                logger.error("Feedback chat fallback applied. reason=too_generic")
+                #if DEBUG
+                DebugTelemetry.increment(.feedbackFallbackTotal)
+                DebugTelemetry.increment(.feedbackTooGeneric)
+                #endif
             }
             return FeedbackMessage(isUser: false, text: validatedAnswer)
         } catch let error as FeedbackChatError {
@@ -180,22 +186,24 @@ struct OpenAIFeedbackChatService: FeedbackChatServicing {
 
     private var systemPrompt: String {
         """
-        你是面向中文母语者的韩语聊天学习助手。
-        用户正在查看某一条韩语聊天解析，并对这句话或其中某个知识点提问。
+        你是面向中文母语者的韩语聊天语法学习助手。
+        用户正在查看某一条韩语聊天解析卡片，并针对 focused_text、其中的词尾、语法、生词、语气进行追问。
 
         回答原则：
-        1) 必须优先围绕 focused_text 回答。nearby_context 只能用于理解上下文，不要把整段聊天重新分析一遍。
-        2) 如果用户问的是某个词、词尾、语法点，请解释：
-           - 它的基础形式或语法形式
-           - 在 focused_text 中对应的原句片段
-           - 在这句话里的具体作用
+        1) 必须优先围绕 focused_text 回答。nearby_context 只能用于理解上下文，不要重新分析整段聊天。
+        2) 默认进入“语法学习模式”：优先解释词尾、助词、连接语法、口语缩写、语气差异，而不是泛泛聊天或泛泛翻译。
+        3) 如果用户问题不够明确，优先解释 focused_grammar_points 中最相关的语法点；若没有明显语法点，再解释 focused_vocabulary 或整体语气。
+        4) 如果用户问某个词、词尾、语法点，请按顺序简短解释：
+           - 基础形式或语法形式
+           - 原句中的实际片段
+           - 在 focused_text 里的作用
            - 中文母语者容易误解的地方
-        3) 如果用户问“这句话自然吗 / 语气怎么样”，请说明亲密度、随意程度、是否像日常聊天，不要过度暧昧化。
-        4) 如果用户问“怎么回复”，给 2-3 个自然韩语回复，每条附中文意思，并说明语气差异。
-        5) 如果 analysis context 没有足够信息，明确说“不确定”，并基于 focused_text 给出谨慎解释，不要编造截图中没有的内容。
-        6) 回答要简洁、口语化、适合初学者。默认 3-6 句话；除非用户要求详细解释。
-        7) 不要输出 Markdown 表格，不要长篇展开。
-        8) 只输出 JSON，不要输出额外文本。
+        5) 如果用户问“这句话自然吗 / 语气怎么样”，请说明亲密度、随意程度、是否像真实韩语聊天；不要过度暧昧化。
+        6) 如果用户明确问“怎么回复”，只给 1-2 个简短自然韩语回复，并附中文意思；不要生成完整回复列表。
+        7) 如果 context 没有足够信息，明确说“不确定”，并基于 focused_text 给出谨慎解释，不要编造截图中没有的内容。
+        8) 回答要短、具体、口语化，适合初学者。默认 3-6 句话；只有用户要求详细解释时才展开。
+        9) 不要输出 Markdown 表格，不要长篇展开。
+        10) 只输出 JSON，不要输出额外文本。
         """
     }
 
@@ -304,6 +312,13 @@ struct OpenAIFeedbackChatService: FeedbackChatServicing {
             )
         }
 
+        if isTooGenericAnswer(trimmed) {
+            return (
+                "这次回答有点笼统。你可以继续追问更具体一点：例如“这是敬语还是平语？”“这个句尾和 -네요 有什么区别？”",
+                .tooGeneric
+            )
+        }
+
         let maxLength = 500
         if trimmed.count <= maxLength {
             return (trimmed, .ok)
@@ -312,12 +327,30 @@ struct OpenAIFeedbackChatService: FeedbackChatServicing {
         let truncated = String(trimmed.prefix(maxLength)).trimmingCharacters(in: .whitespacesAndNewlines)
         return (truncated + "…", .truncated)
     }
+
+    private func isTooGenericAnswer(_ answer: String) -> Bool {
+        let normalized = answer.replacingOccurrences(of: " ", with: "")
+        let genericPhrases = [
+            "就是这个意思",
+            "大概是这个意思",
+            "差不多是这个意思",
+            "就是这样",
+            "大概这样"
+        ]
+
+        if normalized.count <= 18 {
+            return true
+        }
+
+        return genericPhrases.contains { normalized.contains($0) }
+    }
 }
 
 private enum AnswerValidationStatus {
     case ok
     case emptyFallback
     case truncated
+    case tooGeneric
 }
 
 struct FeedbackChatServiceFactory {

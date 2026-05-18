@@ -833,7 +833,36 @@ After implementation, update Docs/development-progress-v1.md with completed task
 
 ---
 
-## 12. V1 Definition of Done
+## 12. Recent Iteration Notes (2026-05-18)
+
+### 12.1 Feedback Chat Guardrail Update
+
+- Added a new post-validation guardrail for overly generic follow-up answers in `FeedbackChatService`.
+- If the answer is too short or matches generic phrasing (e.g. "就是这个意思"), the app now returns a more actionable fallback prompt to guide users toward grammar-focused follow-up questions.
+- New fallback reason telemetry:
+  - `feedback.too_generic`
+
+### 12.2 Prompt Strategy Update
+
+- `FeedbackChat` system prompt was tightened into a grammar-learning-first mode.
+- Ambiguous questions now prioritize grammar-ending and syntax explanation over broad translation/chat.
+- "How to reply" behavior remains supported but constrained to 1-2 short examples.
+
+### 12.3 UI and Flow Update
+
+- Reply-check cards are now shown inline following original chat bubble order in `AnalysisResultView`, rather than grouped at the bottom.
+- This improves readability and bubble-to-feedback alignment in multi-reply scenarios.
+
+### 12.4 Next Validation Checklist
+
+- Run 10-15 real screenshot samples and record:
+  - generic fallback hit rate (`feedback.too_generic`)
+  - over-correction rate in `ReplyCheck`
+  - user comprehension for grammar-focused quick prompts
+
+---
+
+## 13. V1 Definition of Done
 
 V1 can be considered complete when:
 
