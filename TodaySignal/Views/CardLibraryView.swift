@@ -204,26 +204,13 @@ struct VocabCardRow: View {
                     Divider()
                         .padding(.vertical, 14)
 
-                    Text("AI 例句")
-                        .font(.system(size: 10.5, weight: .bold))
-                        .foregroundStyle(Color.inkMute)
-                        .tracking(0.6)
-
-                    Text(card.exampleSentence)
-                        .font(.system(size: 14.5, weight: .medium))
-                        .foregroundStyle(Color.ink)
-                        .padding(.top, 4)
-
-                    Text(card.exampleTranslationZH)
-                        .font(.system(size: 12.5))
-                        .foregroundStyle(Color.inkMute)
-                        .padding(.top, 2)
+                    aiExampleCallout(examples: [(ko: card.exampleSentence, zh: card.exampleTranslationZH)])
 
                     Text("用法笔记")
                         .font(.system(size: 10.5, weight: .bold))
                         .foregroundStyle(Color.inkMute)
                         .tracking(0.6)
-                        .padding(.top, 10)
+                        .padding(.top, 14)
 
                     Text(card.usageNote)
                         .font(.system(size: 13))
@@ -302,28 +289,13 @@ struct GrammarCardRow: View {
                     Divider()
                         .padding(.vertical, 14)
 
-                    Text("AI 例句")
-                        .font(.system(size: 10.5, weight: .bold))
-                        .foregroundStyle(Color.inkMute)
-                        .tracking(0.6)
-
-                    ForEach(Array(card.exampleSentences.enumerated()), id: \.offset) { _, example in
-                        Text(example.ko)
-                            .font(.system(size: 14.5, weight: .medium))
-                            .foregroundStyle(Color.ink)
-                            .padding(.top, 4)
-                        Text(example.zh)
-                            .font(.system(size: 12.5))
-                            .foregroundStyle(Color.inkMute)
-                            .padding(.top, 2)
-                            .padding(.bottom, 6)
-                    }
+                    aiExampleCallout(examples: card.exampleSentences)
 
                     Text("适合关系 / 场景")
                         .font(.system(size: 10.5, weight: .bold))
                         .foregroundStyle(Color.inkMute)
                         .tracking(0.6)
-                        .padding(.top, 8)
+                        .padding(.top, 14)
 
                     Text(card.usageContext)
                         .font(.system(size: 13))

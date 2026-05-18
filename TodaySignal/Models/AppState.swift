@@ -35,12 +35,17 @@ class AppState {
     var retryingResultIDs: Set<UUID> = []
 
     var myReplyCheckResult: ReplyCheckResult?
-    var feedbackMessages: [FeedbackMessage] = []
-    var isSendingFeedback = false
-    var feedbackErrorMessage: String?
+    /// Per-bubble feedback chat threads keyed by AnalysisResult.id.
+    /// V1 keeps these in-memory only; never persisted.
+    var feedbackThreads: [UUID: [FeedbackMessage]] = [:]
+    /// AnalysisResult.id for the in-flight feedback request (nil if none).
+    var feedbackSendingForResultID: UUID?
+    /// Per-bubble feedback error message keyed by AnalysisResult.id.
+    var feedbackErrors: [UUID: String] = [:]
 
     private let aiAnalysisService: AIAnalysisServicing
     private let replySuggestionService: ReplySuggestionServicing
+    private let feedbackChatService: FeedbackChatServicing
     private let cardStorageService: CardStorageService
     private var persistedKnowledgeMarks: [String: KnowledgeAction]
 
@@ -53,10 +58,12 @@ class AppState {
     init(
         aiAnalysisService: AIAnalysisServicing = AIAnalysisServiceFactory.makeDefaultService(),
         replySuggestionService: ReplySuggestionServicing = ReplySuggestionServiceFactory.makeDefaultService(),
+        feedbackChatService: FeedbackChatServicing = FeedbackChatServiceFactory.makeDefaultService(),
         cardStorageService: CardStorageService = .shared
     ) {
         self.aiAnalysisService = aiAnalysisService
         self.replySuggestionService = replySuggestionService
+        self.feedbackChatService = feedbackChatService
         self.cardStorageService = cardStorageService
         self.persistedKnowledgeMarks = cardStorageService.loadKnowledgeMarks()
 
@@ -105,7 +112,9 @@ class AppState {
             let withMarks = applyPersistedKnowledgeMarks(to: merged)
             analysisResults = deduplicateKnowledgePointsGlobally(in: withMarks)
             loadMockMyReplyCheckIfNeeded()
-            feedbackMessages = MockData.v1FeedbackMock
+            feedbackThreads = [:]
+            feedbackErrors = [:]
+            feedbackSendingForResultID = nil
             return true
         } catch {
             if let knownError = error as? AIAnalysisError {
@@ -190,17 +199,43 @@ class AppState {
     }
 
     @MainActor
-    func sendMockFeedback(question: String) async {
+    func sendFeedback(question: String, forResultID resultID: UUID) async {
         let trimmed = question.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !trimmed.isEmpty, !isSendingFeedback else { return }
+        guard !trimmed.isEmpty, feedbackSendingForResultID == nil else { return }
 
-        feedbackErrorMessage = nil
-        isSendingFeedback = true
-        feedbackMessages.append(FeedbackMessage(isUser: true, text: trimmed))
+        guard let focused = analysisResults.first(where: { $0.id == resultID }) else { return }
 
-        try? await Task.sleep(for: .milliseconds(450))
-        feedbackMessages.append(FeedbackMessage(isUser: false, text: "这是 V1 mock 回复：我会结合当前解析结果继续解释这个表达。"))
-        isSendingFeedback = false
+        feedbackErrors[resultID] = nil
+        feedbackSendingForResultID = resultID
+        feedbackThreads[resultID, default: []].append(FeedbackMessage(isUser: true, text: trimmed))
+        defer { feedbackSendingForResultID = nil }
+
+        let nearbyTexts = analysisResults
+            .filter { $0.id != resultID }
+            .map { $0.originalText }
+
+        let context = FeedbackChatContext(
+            focusedText: focused.originalText,
+            focusedTranslationZH: focused.translationZH,
+            focusedToneLabels: focused.toneLabels,
+            focusedVocabulary: focused.vocabulary,
+            focusedGrammarPoints: focused.grammarPoints,
+            nearbyBubbleTexts: nearbyTexts,
+            myReplyCheck: myReplyCheckResult
+        )
+
+        do {
+            let answer = try await feedbackChatService.ask(question: trimmed, context: context)
+            feedbackThreads[resultID, default: []].append(answer)
+        } catch let error as FeedbackChatError {
+            if let debug = error.debugMessage {
+                feedbackErrors[resultID] = "\(error.errorDescription ?? "追问失败")\n\n调试信息：\(debug)"
+            } else {
+                feedbackErrors[resultID] = error.errorDescription ?? "追问失败，请稍后重试。"
+            }
+        } catch {
+            feedbackErrors[resultID] = "追问失败，请稍后重试。"
+        }
     }
 
     @MainActor
@@ -322,9 +357,9 @@ class AppState {
         isGeneratingReply = false
         replyGenerationError = nil
         myReplyCheckResult = nil
-        feedbackMessages = []
-        isSendingFeedback = false
-        feedbackErrorMessage = nil
+        feedbackThreads = [:]
+        feedbackSendingForResultID = nil
+        feedbackErrors = [:]
         navigationPath = NavigationPath()
         selectedTab = .analysis
     }
@@ -382,14 +417,15 @@ class AppState {
 
     /// Create a VocabularyCard from a KnowledgePoint
     private func createVocabularyCard(from point: KnowledgePoint, sentence: String) -> VocabularyCard {
-        VocabularyCard(
+        let example = mockVocabExample(term: point.term, originalSentence: sentence)
+        return VocabularyCard(
             word: point.term,
             meaningZH: point.meaningZH,
             pronunciation: point.pronunciation ?? "",
             partOfSpeech: point.partOfSpeech ?? "",
             originalSentence: sentence,
-            exampleSentence: "예문이 곧 생성됩니다.",
-            exampleTranslationZH: "例句即将生成。",
+            exampleSentence: example.ko,
+            exampleTranslationZH: example.zh,
             usageNote: point.usageNote,
             sourcePointId: point.id
         )
@@ -402,10 +438,29 @@ class AppState {
             meaningZH: point.meaningZH,
             toneNote: point.toneNote ?? "",
             originalSentence: sentence,
-            exampleSentences: [],
+            exampleSentences: mockGrammarExamples(point: point.term, originalSentence: sentence),
             usageContext: point.usageNote,
             sourcePointId: point.id
         )
+    }
+
+    /// Mock vocabulary example generator. Reuses curated `MockData` examples when the term
+    /// is known; otherwise falls back to the source sentence and a generic meaning hint.
+    /// To be replaced by a real CardExampleService when AI integration lands.
+    private func mockVocabExample(term: String, originalSentence: String) -> (ko: String, zh: String) {
+        if let canned = MockData.vocabularyCards.first(where: { $0.word == term }) {
+            return (canned.exampleSentence, canned.exampleTranslationZH)
+        }
+        return (originalSentence, "包含「\(term)」的例句。")
+    }
+
+    /// Mock grammar example generator. Reuses curated `MockData` examples when the grammar
+    /// point is known; otherwise falls back to a single sample built from the source sentence.
+    private func mockGrammarExamples(point: String, originalSentence: String) -> [(ko: String, zh: String)] {
+        if let canned = MockData.grammarCards.first(where: { $0.point == point }) {
+            return canned.exampleSentences
+        }
+        return [(originalSentence, "包含「\(point)」的例句。")]
     }
 
     /// Remove a vocabulary card that was generated from a specific knowledge point

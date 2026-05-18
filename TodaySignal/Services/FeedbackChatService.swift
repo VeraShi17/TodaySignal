@@ -1,0 +1,309 @@
+import Foundation
+import os
+
+enum FeedbackChatError: LocalizedError {
+    case emptyQuestion
+    case timeout
+    case missingAPIKey
+    case unauthorized(message: String?)
+    case rateLimited(message: String?)
+    case serverError(message: String?)
+    case serviceUnavailable(message: String?)
+    case invalidResponse(message: String?)
+
+    var errorDescription: String? {
+        switch self {
+        case .emptyQuestion:
+            return "请输入你的追问内容。"
+        case .timeout:
+            return "回答超时，请稍后重试。"
+        case .missingAPIKey:
+            return "未配置 OpenAI API Key。"
+        case .unauthorized:
+            return "API Key 无效或权限不足（401）。"
+        case .rateLimited:
+            return "请求过于频繁或额度不足（429），请稍后再试。"
+        case .serverError:
+            return "OpenAI 服务暂时不可用（5xx），请稍后重试。"
+        case .serviceUnavailable:
+            return "追问服务暂时不可用，请稍后重试。"
+        case .invalidResponse:
+            return "回答格式异常，请重试。"
+        }
+    }
+
+    var debugMessage: String? {
+        switch self {
+        case .unauthorized(let message),
+             .rateLimited(let message),
+             .serverError(let message),
+             .serviceUnavailable(let message),
+             .invalidResponse(let message):
+            return message
+        default:
+            return nil
+        }
+    }
+}
+
+struct FeedbackChatContext {
+    let focusedText: String
+    let focusedTranslationZH: String
+    let focusedToneLabels: [ToneLabel]
+    let focusedVocabulary: [KnowledgePoint]
+    let focusedGrammarPoints: [KnowledgePoint]
+    let nearbyBubbleTexts: [String]
+    let myReplyCheck: ReplyCheckResult?
+}
+
+protocol FeedbackChatServicing {
+    func ask(question: String, context: FeedbackChatContext) async throws -> FeedbackMessage
+}
+
+struct MockFeedbackChatService: FeedbackChatServicing {
+    func ask(question: String, context: FeedbackChatContext) async throws -> FeedbackMessage {
+        let trimmed = question.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else { throw FeedbackChatError.emptyQuestion }
+
+        try await Task.sleep(for: .milliseconds(450))
+        return FeedbackMessage(
+            isUser: false,
+            text: "这是 V1 mock 回复：针对「\(context.focusedText)」的「\(trimmed)」 — 真接入 AI 后会基于这条原句的解析做针对性解释。"
+        )
+    }
+}
+
+struct OpenAIFeedbackChatService: FeedbackChatServicing {
+    private let apiKey: String
+    private let model: String
+    private let showDebugErrorDetails: Bool
+    private let logger = Logger(subsystem: "TodaySignal", category: "FeedbackChat")
+
+    init(config: OpenAIConfig) throws {
+        guard let key = config.apiKey, !key.isEmpty else {
+            throw FeedbackChatError.missingAPIKey
+        }
+        self.apiKey = key
+        self.model = config.model
+        self.showDebugErrorDetails = config.showDebugErrorDetails
+    }
+
+    func ask(question: String, context: FeedbackChatContext) async throws -> FeedbackMessage {
+        let trimmed = question.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else { throw FeedbackChatError.emptyQuestion }
+
+        let payload: [String: Any] = [
+            "model": model,
+            "messages": [
+                ["role": "system", "content": systemPrompt],
+                ["role": "user", "content": buildUserContent(question: trimmed, context: context)]
+            ],
+            "response_format": [
+                "type": "json_schema",
+                "json_schema": [
+                    "name": "feedback_chat_output",
+                    "strict": true,
+                    "schema": responseSchema
+                ]
+            ],
+            "temperature": 0.3
+        ]
+
+        let body = try JSONSerialization.data(withJSONObject: payload)
+
+        var urlRequest = URLRequest(url: URL(string: "https://api.openai.com/v1/chat/completions")!)
+        urlRequest.httpMethod = "POST"
+        urlRequest.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        urlRequest.setValue("Bearer \(apiKey)", forHTTPHeaderField: "Authorization")
+        urlRequest.httpBody = body
+        urlRequest.timeoutInterval = 60
+
+        let sessionConfig = URLSessionConfiguration.ephemeral
+        sessionConfig.timeoutIntervalForRequest = 60
+        sessionConfig.timeoutIntervalForResource = 65
+        let session = URLSession(configuration: sessionConfig)
+
+        do {
+            let startedAt = Date()
+            let (data, response) = try await session.data(for: urlRequest)
+            guard let http = response as? HTTPURLResponse else {
+                throw FeedbackChatError.serviceUnavailable(message: "Invalid HTTP response")
+            }
+
+            guard (200...299).contains(http.statusCode) else {
+                let serverMessage = extractOpenAIErrorMessage(from: data)
+                logger.error("Feedback chat failed. status=\(http.statusCode)")
+                throw mapStatusCodeToError(http.statusCode, serverMessage: serverMessage)
+            }
+
+            let chatResponse = try JSONDecoder().decode(OpenAIFeedbackChatResponse.self, from: data)
+            guard let content = chatResponse.choices.first?.message.content else {
+                throw FeedbackChatError.invalidResponse(message: "Missing choices[0].message.content")
+            }
+
+            let parsed = try JSONDecoder().decode(OpenAIFeedbackChatEnvelope.self, from: Data(content.utf8))
+            let elapsed = Date().timeIntervalSince(startedAt)
+            logger.info("Feedback chat succeeded. elapsed=\(elapsed, format: .fixed(precision: 3))s")
+
+            return FeedbackMessage(isUser: false, text: parsed.answerZh)
+        } catch let error as FeedbackChatError {
+            throw error
+        } catch let error as URLError where error.code == .timedOut {
+            throw FeedbackChatError.timeout
+        } catch let error as URLError {
+            throw FeedbackChatError.serviceUnavailable(message: "Network error: \(error.localizedDescription)")
+        } catch {
+            throw FeedbackChatError.invalidResponse(message: error.localizedDescription)
+        }
+    }
+
+    private var systemPrompt: String {
+        """
+        你是韩语聊天学习助手。用户正在查看某一条韩语聊天解析，并对这句话提问。
+
+        要求：
+        1) 优先围绕 focused_text 回答，可以参考 nearby_context 理解上下文，但不要泛泛解释整段聊天。
+        2) 答案必须基于提供的 analysis context；如果 context 中没有相关信息，明确告诉用户"不确定"，不要编造截图中没有的内容。
+        3) 回答要简洁、口语化，适合中文母语者学习韩语。
+        4) 如果用户问语法，解释语法形式、在原句中的作用、自然语气。
+        5) 如果用户问怎么回复，给 2-3 个自然韩语回复，并附中文意思。
+        6) 谨慎判断语气和关系感，避免过度暧昧化或冒犯。
+        7) 回答不要过长，重点突出，便于学习。
+        8) 只输出 JSON，不要输出额外文本。
+        """
+    }
+
+    private func buildUserContent(question: String, context: FeedbackChatContext) -> String {
+        var lines: [String] = []
+        lines.append("focused_text:")
+        lines.append(context.focusedText)
+
+        if !context.focusedTranslationZH.isEmpty {
+            lines.append("")
+            lines.append("focused_translation:")
+            lines.append(context.focusedTranslationZH)
+        }
+
+        if !context.focusedToneLabels.isEmpty {
+            lines.append("")
+            lines.append("focused_tone: \(context.focusedToneLabels.map(\.rawValue).joined(separator: ", "))")
+        }
+
+        if !context.focusedVocabulary.isEmpty {
+            lines.append("")
+            lines.append("focused_vocabulary:")
+            for point in context.focusedVocabulary {
+                lines.append("- \(point.term)(\(point.meaningZH)) | \(point.usageNote)")
+            }
+        }
+
+        if !context.focusedGrammarPoints.isEmpty {
+            lines.append("")
+            lines.append("focused_grammar_points:")
+            for point in context.focusedGrammarPoints {
+                let tone = point.toneNote.map { "; 语气: \($0)" } ?? ""
+                lines.append("- \(point.term)(\(point.meaningZH))\(tone) | \(point.usageNote)")
+            }
+        }
+
+        if !context.nearbyBubbleTexts.isEmpty {
+            lines.append("")
+            lines.append("nearby_context:")
+            for text in context.nearbyBubbleTexts {
+                lines.append("- \(text)")
+            }
+        }
+
+        if let check = context.myReplyCheck {
+            lines.append("")
+            lines.append("my_reply_check:")
+            lines.append("- 原句: \(check.originalReply)")
+            lines.append("- 状态: \(check.status == .natural ? "表达自然" : "可以更自然")")
+            lines.append("- 反馈: \(check.feedbackZh)")
+            if let alt = check.suggestedReplyKo {
+                lines.append("- 替代表达: \(alt)")
+            }
+        }
+
+        lines.append("")
+        lines.append("user_question:")
+        lines.append(question)
+        return lines.joined(separator: "\n")
+    }
+
+    private var responseSchema: [String: Any] {
+        [
+            "type": "object",
+            "additionalProperties": false,
+            "properties": [
+                "answer_zh": ["type": "string"]
+            ],
+            "required": ["answer_zh"]
+        ]
+    }
+
+    private func mapStatusCodeToError(_ statusCode: Int, serverMessage: String?) -> FeedbackChatError {
+        let debugSuffix: String? = {
+            guard showDebugErrorDetails else { return nil }
+            guard let serverMessage, !serverMessage.isEmpty else { return "HTTP \(statusCode)" }
+            return "HTTP \(statusCode): \(serverMessage)"
+        }()
+
+        switch statusCode {
+        case 401, 403:
+            return .unauthorized(message: debugSuffix)
+        case 429:
+            return .rateLimited(message: debugSuffix)
+        case 500...599:
+            return .serverError(message: debugSuffix)
+        default:
+            return .serviceUnavailable(message: debugSuffix)
+        }
+    }
+
+    private func extractOpenAIErrorMessage(from data: Data) -> String? {
+        guard let payload = try? JSONDecoder().decode(OpenAIFeedbackErrorEnvelope.self, from: data) else {
+            return nil
+        }
+        return payload.error.message
+    }
+}
+
+struct FeedbackChatServiceFactory {
+    static func makeDefaultService() -> FeedbackChatServicing {
+        let config = OpenAIConfig.load()
+
+        if config.useRealService {
+            if let service = try? OpenAIFeedbackChatService(config: config) {
+                return service
+            }
+        }
+
+        return MockFeedbackChatService()
+    }
+}
+
+private struct OpenAIFeedbackChatResponse: Decodable {
+    struct Choice: Decodable {
+        struct Message: Decodable {
+            let content: String?
+        }
+        let message: Message
+    }
+    let choices: [Choice]
+}
+
+private struct OpenAIFeedbackErrorEnvelope: Decodable {
+    struct OpenAIError: Decodable {
+        let message: String
+    }
+    let error: OpenAIError
+}
+
+private struct OpenAIFeedbackChatEnvelope: Decodable {
+    let answerZh: String
+
+    enum CodingKeys: String, CodingKey {
+        case answerZh = "answer_zh"
+    }
+}

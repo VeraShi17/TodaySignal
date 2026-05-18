@@ -13,28 +13,36 @@ function Frame({ children, dark = false }) {
 
 // ─── Interactive: full Learn flow (V1) ───
 function LearnFlowV1() {
-  const [step, setStep] = React.useState('home'); // home -> confirm -> loading -> analysis
+  // step: home → confirm → loading → analysis  |  confirm → reply-select → quickreply
+  const [step, setStep] = React.useState('home');
+  const [confirmMode, setConfirmMode] = React.useState('ocr'); // 'ocr' | 'reply'
   const [idolSide, setIdolSide] = React.useState('left');
   const [checkMy, setCheckMy] = React.useState(true);
   const [selectedIdol, setSelectedIdol] = React.useState([]);
   const [showCard, setShowCard] = React.useState(false);
 
   const toggleIdol = id => setSelectedIdol(s => s.includes(id) ? s.filter(x => x !== id) : [...s, id]);
+  const reset = () => {
+    setStep('home'); setConfirmMode('ocr'); setSelectedIdol([]); setShowCard(false);
+  };
 
   const screen =
     step === 'home' ? (
       <HomeScreenV1
-        onLearn={() => setStep('confirm')}
+        onLearn={() => { setConfirmMode('ocr'); setStep('confirm'); }}
         onQuickReply={() => setStep('quickreply')}
       />
     ) :
     step === 'confirm' ? (
       <ConfirmScreenV1
+        mode={confirmMode}
         idolSide={idolSide} setIdolSide={setIdolSide}
         checkMyReplies={checkMy} setCheckMyReplies={setCheckMy}
         selectedIdolIds={selectedIdol} toggleIdol={toggleIdol}
         onAnalyze={() => { setStep('loading'); setTimeout(() => setStep('analysis'), 1600); }}
-        onGenReply={() => { setStep('quickreply'); }}
+        onEnterReplySelect={() => { setConfirmMode('reply'); }}
+        onCancelReplySelect={() => { setConfirmMode('ocr'); setSelectedIdol([]); }}
+        onConfirmReply={() => { setStep('quickreply'); }}
       />
     ) :
     step === 'loading' ? <LoadingScreen /> :
@@ -48,7 +56,7 @@ function LearnFlowV1() {
       {screen}
       {showCard && <CardPreviewModalV1 onDismiss={() => setShowCard(false)} />}
       {step !== 'home' && (
-        <div onClick={() => { setStep('home'); setSelectedIdol([]); setShowCard(false); }} style={{
+        <div onClick={reset} style={{
           position: 'absolute', top: 60, right: 12, zIndex: 200,
           fontSize: 11, color: 'var(--ink-mute)', background: 'rgba(255,255,255,0.85)',
           padding: '4px 10px', borderRadius: 999, cursor: 'pointer',
@@ -102,19 +110,41 @@ function App() {
         </DCArtboard>
       </DCSection>
 
-      <DCSection id="confirm" title="② OCR Confirmation V1" subtitle="Selectable idol bubbles · check-my-reply toggle · 学习解析 + 生成回复建议">
-        <DCArtboard id="confirm-empty" label="Confirm · no selection" width={W} height={H}>
+      <DCSection id="confirm" title="② OCR Confirmation V1" subtitle="Two modes: OCR-confirm (default, no checkboxes) vs Reply-select (entered via 生成回复建议)">
+        <DCArtboard id="confirm-ocr-default" label="★ Mode A · OCR 确认 (default · no checkboxes)" width={W} height={H}>
           <Frame>
             <ConfirmScreenV1
+              mode="ocr"
               idolSide="left" setIdolSide={() => {}}
               checkMyReplies={true} setCheckMyReplies={() => {}}
               selectedIdolIds={[]} toggleIdol={() => {}}
             />
           </Frame>
         </DCArtboard>
-        <DCArtboard id="confirm-selected" label="Confirm · 2 bubbles selected" width={W} height={H}>
+        <DCArtboard id="confirm-ocr-uncheck" label="Mode A · 不检查我的回复" width={W} height={H}>
           <Frame>
             <ConfirmScreenV1
+              mode="ocr"
+              idolSide="left" setIdolSide={() => {}}
+              checkMyReplies={false} setCheckMyReplies={() => {}}
+              selectedIdolIds={[]} toggleIdol={() => {}}
+            />
+          </Frame>
+        </DCArtboard>
+        <DCArtboard id="confirm-reply-empty" label="★ Mode B · 选择要回复 (no selection)" width={W} height={H}>
+          <Frame>
+            <ConfirmScreenV1
+              mode="reply"
+              idolSide="left" setIdolSide={() => {}}
+              checkMyReplies={true} setCheckMyReplies={() => {}}
+              selectedIdolIds={[]} toggleIdol={() => {}}
+            />
+          </Frame>
+        </DCArtboard>
+        <DCArtboard id="confirm-reply-selected" label="Mode B · 2 条已选" width={W} height={H}>
+          <Frame>
+            <ConfirmScreenV1
+              mode="reply"
               idolSide="left" setIdolSide={() => {}}
               checkMyReplies={true} setCheckMyReplies={() => {}}
               selectedIdolIds={[3, 4]} toggleIdol={() => {}}

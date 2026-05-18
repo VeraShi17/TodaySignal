@@ -3,6 +3,7 @@ import SwiftUI
 struct AnalysisResultView: View {
     @Environment(AppState.self) private var appState
     @State private var feedbackInput: String = ""
+    @State private var focusedResultID: UUID?
     var onDone: () -> Void
 
     var body: some View {
@@ -45,6 +46,10 @@ struct AnalysisResultView: View {
                             },
                             onShowCardPreview: { cardType in
                                 // Card preview is now triggered by AppState.updateKnowledgeAction
+                            },
+                            onAskQuestion: {
+                                feedbackInput = ""
+                                focusedResultID = result.id
                             }
                         )
                         .padding(.bottom, 16)
@@ -53,13 +58,6 @@ struct AnalysisResultView: View {
                     if appState.checkMyReplyEnabled, appState.hasMySideBubbles(), let check = appState.myReplyCheckResult {
                         myReplyCheckSection(check)
                             .padding(.bottom, 16)
-                    }
-
-                    feedbackChatInputBlock
-
-                    if !appState.feedbackMessages.isEmpty || appState.isSendingFeedback || appState.feedbackErrorMessage != nil {
-                        feedbackConversationBlock
-                            .padding(.top, 12)
                     }
 
                     Spacer().frame(height: 120)
@@ -131,6 +129,19 @@ struct AnalysisResultView: View {
             )
             .presentationDetents([.large])
             .presentationDragIndicator(.visible)
+        }
+        .sheet(isPresented: Binding(
+            get: { focusedResultID != nil },
+            set: { isPresented in
+                if !isPresented { focusedResultID = nil }
+            }
+        )) {
+            if let id = focusedResultID,
+               let result = appState.analysisResults.first(where: { $0.id == id }) {
+                focusedFeedbackSheet(result: result)
+                    .presentationDetents([.medium, .large])
+                    .presentationDragIndicator(.visible)
+            }
         }
     }
 
@@ -259,215 +270,230 @@ struct AnalysisResultView: View {
         }
     }
 
-    private var feedbackChatInputBlock: some View {
-        VStack(alignment: .leading, spacing: 10) {
-            HStack(spacing: 8) {
-                RoundedRectangle(cornerRadius: 9)
-                    .fill(.white)
-                    .frame(width: 28, height: 28)
-                    .overlay {
-                        Image(systemName: "sparkle")
-                            .font(.system(size: 14, weight: .semibold))
-                            .foregroundStyle(Color(hex: "7860B3"))
-                    }
-                Text("还有哪里不懂？")
-                    .font(.system(size: 15, weight: .bold))
-                    .foregroundStyle(Color.ink)
-            }
+    @ViewBuilder
+    private func focusedFeedbackSheet(result: AnalysisResult) -> some View {
+        let thread = appState.feedbackThreads[result.id] ?? []
+        let isSending = appState.feedbackSendingForResultID == result.id
+        let errorMessage = appState.feedbackErrors[result.id]
 
-            Text("关于这次聊天的追问 · 答案不会保存为卡片")
-                .font(.system(size: 11.5))
-                .foregroundStyle(Color.inkMute)
-                .padding(.leading, 36)
-                .padding(.bottom, 4)
-
-            // Quick chips
-            FlowChips(items: ["这里为什么这么说？", "这几条要连起来看吗？", "这个语气自然吗？"]) { text in
-                feedbackInput = text
-            }
-
-            // Input row
-            HStack(spacing: 6) {
-                TextField("例如：这里为什么用 -는데？", text: $feedbackInput)
-                    .textInputAutocapitalization(.never)
-                    .autocorrectionDisabled()
-                    .padding(.leading, 14)
-                    .padding(.trailing, 6)
-                    .frame(height: 36)
-                    .font(.system(size: 14))
-
-                Button {
-                    sendFeedback()
-                } label: {
-                    Text("发送")
-                        .font(.system(size: 13, weight: .semibold))
-                        .foregroundStyle(.white)
-                        .padding(.horizontal, 14)
-                        .frame(height: 36)
-                        .background(feedbackInput.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? Color(hex: "E5DFEE") : Color(hex: "7860B3"))
-                        .clipShape(RoundedRectangle(cornerRadius: 12))
-                }
-                .buttonStyle(.plain)
-                .disabled(appState.isSendingFeedback || feedbackInput.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
-                .padding(.trailing, 4)
-            }
-            .background(.white)
-            .clipShape(RoundedRectangle(cornerRadius: 16))
-            .overlay(
-                RoundedRectangle(cornerRadius: 16)
-                    .stroke(Color.lavenderSoft, lineWidth: 1)
-            )
-        }
-        .padding(16)
-        .background(
-            LinearGradient(
-                colors: [.white, Color.bgLavender.opacity(0.6)],
-                startPoint: .topLeading,
-                endPoint: .bottomTrailing
-            )
-        )
-        .clipShape(RoundedRectangle(cornerRadius: 22))
-        .overlay(
-            RoundedRectangle(cornerRadius: 22)
-                .stroke(Color.lavenderSoft, lineWidth: 1)
-        )
-    }
-
-    private var feedbackConversationBlock: some View {
-        VStack(spacing: 10) {
-            ForEach(appState.feedbackMessages) { msg in
-                if msg.isUser {
-                    HStack {
-                        Spacer(minLength: 40)
-                        Text(msg.text)
-                            .font(.system(size: 14))
-                            .foregroundStyle(.white)
-                            .padding(.horizontal, 14)
-                            .padding(.vertical, 10)
-                            .background(Color(hex: "7860B3"))
-                            .clipShape(
-                                UnevenRoundedRectangle(
-                                    topLeadingRadius: 18,
-                                    bottomLeadingRadius: 18,
-                                    bottomTrailingRadius: 18,
-                                    topTrailingRadius: 6
-                                )
-                            )
-                    }
-                } else {
-                    HStack(alignment: .top, spacing: 8) {
-                        RoundedRectangle(cornerRadius: 8)
-                            .fill(Color.bgLavender)
-                            .frame(width: 26, height: 26)
-                            .overlay {
-                                Image(systemName: "sparkle")
-                                    .font(.system(size: 12, weight: .semibold))
-                                    .foregroundStyle(Color(hex: "7860B3"))
-                            }
-                        Text(msg.text)
-                            .font(.system(size: 13.5))
-                            .foregroundStyle(Color.ink2)
-                            .lineSpacing(4)
-                            .padding(.horizontal, 14)
-                            .padding(.vertical, 10)
-                            .background(.white)
-                            .clipShape(
-                                UnevenRoundedRectangle(
-                                    topLeadingRadius: 6,
-                                    bottomLeadingRadius: 18,
-                                    bottomTrailingRadius: 18,
-                                    topTrailingRadius: 18
-                                )
-                            )
-                            .overlay(
-                                UnevenRoundedRectangle(
-                                    topLeadingRadius: 6,
-                                    bottomLeadingRadius: 18,
-                                    bottomTrailingRadius: 18,
-                                    topTrailingRadius: 18
-                                )
-                                .stroke(Color.lavenderSoft, lineWidth: 1)
-                            )
-                        Spacer(minLength: 40)
-                    }
-                }
-            }
-
-            if appState.isSendingFeedback {
+        VStack(spacing: 0) {
+            // Header
+            VStack(alignment: .leading, spacing: 6) {
                 HStack(spacing: 8) {
-                    ProgressView()
-                        .controlSize(.small)
-                    Text("正在继续解释这个表达…")
-                        .font(.system(size: 12.5))
-                        .foregroundStyle(Color.inkMute)
+                    RoundedRectangle(cornerRadius: 9)
+                        .fill(Color.bgLavender)
+                        .frame(width: 28, height: 28)
+                        .overlay {
+                            Image(systemName: "sparkle")
+                                .font(.system(size: 14, weight: .semibold))
+                                .foregroundStyle(Color(hex: "7860B3"))
+                        }
+                    Text("关于这句话提问")
+                        .font(.system(size: 16, weight: .bold))
+                        .foregroundStyle(Color.ink)
                     Spacer()
                 }
+
+                Text(result.originalText)
+                    .font(.system(size: 14))
+                    .foregroundStyle(Color.ink)
+                    .lineSpacing(3)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .padding(.horizontal, 14)
+                    .padding(.vertical, 10)
+                    .background(Color.bgLavender.opacity(0.55))
+                    .clipShape(RoundedRectangle(cornerRadius: 12))
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 12)
+                            .stroke(Color.lavenderSoft, lineWidth: 1)
+                    )
+                    .padding(.top, 4)
+            }
+            .padding(.horizontal, 18)
+            .padding(.top, 8)
+            .padding(.bottom, 12)
+
+            Divider()
+
+            // Conversation thread
+            ScrollView {
+                VStack(spacing: 10) {
+                    if thread.isEmpty {
+                        Text("点选下方快捷问题，或直接输入你想问的。")
+                            .font(.system(size: 12.5))
+                            .foregroundStyle(Color.inkMute)
+                            .multilineTextAlignment(.center)
+                            .frame(maxWidth: .infinity)
+                            .padding(.vertical, 18)
+                    } else {
+                        ForEach(thread) { msg in
+                            messageBubble(msg)
+                        }
+                    }
+
+                    if isSending {
+                        HStack(spacing: 8) {
+                            ProgressView()
+                                .controlSize(.small)
+                            Text("正在继续解释这个表达…")
+                                .font(.system(size: 12.5))
+                                .foregroundStyle(Color.inkMute)
+                            Spacer()
+                        }
+                        .padding(.top, 4)
+                    }
+
+                    if let errorMessage {
+                        Text(errorMessage)
+                            .font(.system(size: 12.5))
+                            .foregroundStyle(Color(hex: "B34A5E"))
+                            .padding(.horizontal, 12)
+                            .padding(.vertical, 10)
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                            .background(Color.bgSoft)
+                            .clipShape(RoundedRectangle(cornerRadius: 12))
+                    }
+                }
+                .padding(.horizontal, 18)
+                .padding(.top, 12)
+                .padding(.bottom, 8)
             }
 
-            if let feedbackErrorMessage = appState.feedbackErrorMessage {
-                Text(feedbackErrorMessage)
-                    .font(.system(size: 12.5))
-                    .foregroundStyle(Color(hex: "B34A5E"))
-                    .padding(.horizontal, 12)
+            Divider()
+
+            // Quick chips + input
+            VStack(alignment: .leading, spacing: 10) {
+                WrapLayout(spacing: 6, lineSpacing: 6) {
+                    ForEach(["这里为什么这么说？", "这个语气自然吗？", "这几个词连起来怎么看？", "可以怎么回复？"], id: \.self) { chip in
+                        Button {
+                            feedbackInput = chip
+                        } label: {
+                            Text(chip)
+                                .font(.system(size: 12, weight: .medium))
+                                .foregroundStyle(Color(hex: "7860B3"))
+                                .padding(.horizontal, 12)
+                                .frame(height: 28)
+                                .background(.white)
+                                .clipShape(Capsule())
+                                .overlay(Capsule().stroke(Color.lavenderSoft, lineWidth: 1))
+                        }
+                        .buttonStyle(.plain)
+                    }
+                }
+
+                HStack(spacing: 6) {
+                    TextField("例如：为什么这里用 -아/어도 되다？", text: $feedbackInput)
+                        .textInputAutocapitalization(.never)
+                        .autocorrectionDisabled()
+                        .padding(.leading, 14)
+                        .padding(.trailing, 6)
+                        .frame(height: 36)
+                        .font(.system(size: 14))
+
+                    Button {
+                        sendFocusedFeedback(resultID: result.id)
+                    } label: {
+                        Text("发送")
+                            .font(.system(size: 13, weight: .semibold))
+                            .foregroundStyle(.white)
+                            .padding(.horizontal, 14)
+                            .frame(height: 36)
+                            .background(canSendFeedback(isSending: isSending) ? Color(hex: "7860B3") : Color(hex: "E5DFEE"))
+                            .clipShape(RoundedRectangle(cornerRadius: 12))
+                    }
+                    .buttonStyle(.plain)
+                    .disabled(!canSendFeedback(isSending: isSending))
+                    .padding(.trailing, 4)
+                }
+                .background(.white)
+                .clipShape(RoundedRectangle(cornerRadius: 16))
+                .overlay(
+                    RoundedRectangle(cornerRadius: 16)
+                        .stroke(Color.lavenderSoft, lineWidth: 1)
+                )
+            }
+            .padding(.horizontal, 18)
+            .padding(.top, 12)
+            .padding(.bottom, 22)
+            .background(Color.bgPage)
+        }
+        .background(Color.bgPage.ignoresSafeArea())
+    }
+
+    @ViewBuilder
+    private func messageBubble(_ msg: FeedbackMessage) -> some View {
+        if msg.isUser {
+            HStack {
+                Spacer(minLength: 40)
+                Text(msg.text)
+                    .font(.system(size: 14))
+                    .foregroundStyle(.white)
+                    .padding(.horizontal, 14)
                     .padding(.vertical, 10)
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                    .background(Color.bgSoft)
-                    .clipShape(RoundedRectangle(cornerRadius: 12))
+                    .background(Color(hex: "7860B3"))
+                    .clipShape(
+                        UnevenRoundedRectangle(
+                            topLeadingRadius: 18,
+                            bottomLeadingRadius: 18,
+                            bottomTrailingRadius: 18,
+                            topTrailingRadius: 6
+                        )
+                    )
+            }
+        } else {
+            HStack(alignment: .top, spacing: 8) {
+                RoundedRectangle(cornerRadius: 8)
+                    .fill(Color.bgLavender)
+                    .frame(width: 26, height: 26)
+                    .overlay {
+                        Image(systemName: "sparkle")
+                            .font(.system(size: 12, weight: .semibold))
+                            .foregroundStyle(Color(hex: "7860B3"))
+                    }
+                Text(msg.text)
+                    .font(.system(size: 13.5))
+                    .foregroundStyle(Color.ink2)
+                    .lineSpacing(4)
+                    .padding(.horizontal, 14)
+                    .padding(.vertical, 10)
+                    .background(.white)
+                    .clipShape(
+                        UnevenRoundedRectangle(
+                            topLeadingRadius: 6,
+                            bottomLeadingRadius: 18,
+                            bottomTrailingRadius: 18,
+                            topTrailingRadius: 18
+                        )
+                    )
+                    .overlay(
+                        UnevenRoundedRectangle(
+                            topLeadingRadius: 6,
+                            bottomLeadingRadius: 18,
+                            bottomTrailingRadius: 18,
+                            topTrailingRadius: 18
+                        )
+                        .stroke(Color.lavenderSoft, lineWidth: 1)
+                    )
+                Spacer(minLength: 40)
             }
         }
     }
 
-    private func sendFeedback() {
+    private func canSendFeedback(isSending: Bool) -> Bool {
+        !isSending && !feedbackInput.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+    }
+
+    private func sendFocusedFeedback(resultID: UUID) {
         let question = feedbackInput.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !question.isEmpty else { return }
         feedbackInput = ""
         Task {
-            await appState.sendMockFeedback(question: question)
+            await appState.sendFeedback(question: question, forResultID: resultID)
         }
     }
 }
 
-// MARK: - Flow Chips (wrap layout for feedback quick chips)
-
-private struct FlowChips: View {
-    let items: [String]
-    let onTap: (String) -> Void
-
-    var body: some View {
-        FlexibleHStack(spacing: 6, lineSpacing: 6) {
-            ForEach(items, id: \.self) { item in
-                Button {
-                    onTap(item)
-                } label: {
-                    Text(item)
-                        .font(.system(size: 12, weight: .medium))
-                        .foregroundStyle(Color(hex: "7860B3"))
-                        .padding(.horizontal, 12)
-                        .frame(height: 28)
-                        .background(.white)
-                        .clipShape(Capsule())
-                        .overlay(
-                            Capsule().stroke(Color.lavenderSoft, lineWidth: 1)
-                        )
-                }
-                .buttonStyle(.plain)
-            }
-        }
-    }
-}
-
-private struct FlexibleHStack<Content: View>: View {
-    let spacing: CGFloat
-    let lineSpacing: CGFloat
-    @ViewBuilder let content: () -> Content
-
-    var body: some View {
-        // Simple wrap using Layout protocol (iOS 16+); fallback works on iOS 17.
-        WrapLayout(spacing: spacing, lineSpacing: lineSpacing) {
-            content()
-        }
-    }
-}
+// MARK: - WrapLayout (used by tone chips, feedback quick chips)
 
 struct WrapLayout: Layout {
     var spacing: CGFloat = 6
@@ -526,6 +552,7 @@ struct AnalysisBubbleCardView: View {
     var onRetryFailed: (() -> Void)?
     var onKnowledgeAction: (UUID, KnowledgeAction) -> Void
     var onShowCardPreview: (LearningCardType) -> Void
+    var onAskQuestion: () -> Void = {}
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
@@ -544,6 +571,19 @@ struct AnalysisBubbleCardView: View {
         .padding(14)
         .background(Color.bgElev)
         .clipShape(RoundedRectangle(cornerRadius: 22))
+        .overlay(alignment: .topTrailing) {
+            // Per-bubble follow-up question button
+            Button(action: onAskQuestion) {
+                Image(systemName: "questionmark.circle.fill")
+                    .font(.system(size: 22, weight: .regular))
+                    .foregroundStyle(Color(hex: "7860B3"))
+                    .padding(.top, 10)
+                    .padding(.trailing, 12)
+                    .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+            .accessibilityLabel("针对这句话提问")
+        }
         .overlay(
             RoundedRectangle(cornerRadius: 22)
                 .stroke(Color.line, lineWidth: 1)

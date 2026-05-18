@@ -3,6 +3,7 @@ import SwiftUI
 struct ReplySuggestionView: View {
     @Environment(AppState.self) private var appState
     @State private var contextInput = ""
+    @State private var showEmptyContextAlert = false
 
     var body: some View {
         @Bindable var appState = appState
@@ -28,6 +29,11 @@ struct ReplySuggestionView: View {
         }
         .navigationTitle("生成回复建议")
         .navigationBarTitleDisplayMode(.inline)
+        .alert("先选一条想回复的消息", isPresented: $showEmptyContextAlert) {
+            Button("我知道了", role: .cancel) { }
+        } message: {
+            Text("回到 OCR 页面勾选 idol 气泡，或在这里输入你想说的话。")
+        }
     }
 
     private var contextSection: some View {
@@ -334,11 +340,16 @@ struct ReplySuggestionView: View {
         VStack(spacing: 0) {
             Divider()
             Button {
-                if appState.replyContextBubbles.isEmpty {
-                    let trimmed = contextInput.trimmingCharacters(in: .whitespacesAndNewlines)
-                    if !trimmed.isEmpty {
-                        appState.replyContextBubbles = [ChatBubble(side: .left, speakerRole: .idol, text: trimmed)]
-                    }
+                let trimmedContext = contextInput.trimmingCharacters(in: .whitespacesAndNewlines)
+                let trimmedIntent = appState.replyIntentZh.trimmingCharacters(in: .whitespacesAndNewlines)
+
+                if appState.replyContextBubbles.isEmpty && trimmedContext.isEmpty && trimmedIntent.isEmpty {
+                    showEmptyContextAlert = true
+                    return
+                }
+
+                if appState.replyContextBubbles.isEmpty && !trimmedContext.isEmpty {
+                    appState.replyContextBubbles = [ChatBubble(side: .left, speakerRole: .idol, text: trimmedContext)]
                 }
                 Task {
                     await appState.generateReplySuggestions()

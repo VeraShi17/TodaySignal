@@ -76,17 +76,25 @@ function ToneChip({ label, hint, icon, selected, onClick }) {
   );
 }
 
-// Selectable chat bubble — V1 variant of ChatBubble with checkbox affordance
-function SelectableBubble({ side = 'left', text, idolSide, selected, onToggle, image }) {
+// Chat bubble — V1 variant with two modes:
+//   mode='ocr-edit'    → no checkbox; floating circular edit/删除 buttons on outer side
+//   mode='reply-select'→ checkbox on idol bubbles only; user bubbles dim as context
+function SelectableBubble({ side = 'left', text, idolSide, selected, onToggle, image, mode = 'ocr-edit' }) {
   const isIdol = side === idolSide;
   const isLeft = side === 'left';
+  const isSelectMode = mode === 'reply-select';
+  const isContext = isSelectMode && !isIdol; // user bubbles in reply-select = context only
+
   const fill = isLeft ? '#FFFFFF' : 'var(--pink-tint)';
-  const border = selected ? '1.5px solid var(--pink)' : (isIdol ? '1.5px solid var(--pink-soft)' : '1px solid var(--line)');
+  const border = (isSelectMode && selected)
+    ? '1.5px solid var(--pink)'
+    : (isIdol ? '1.5px solid var(--pink-soft)' : '1px solid var(--line)');
+
   return (
-    <div style={{ display: 'flex', justifyContent: isLeft ? 'flex-start' : 'flex-end', marginBottom: 10 }}>
-      <div style={{ maxWidth: '82%', position: 'relative', display: 'flex', alignItems: 'flex-start', gap: 6 }}>
-        {/* checkbox on left side of idol bubbles */}
-        {isIdol && (
+    <div style={{ display: 'flex', justifyContent: isLeft ? 'flex-start' : 'flex-end', marginBottom: 14, opacity: isContext ? 0.55 : 1 }}>
+      <div style={{ maxWidth: '78%', position: 'relative', display: 'flex', alignItems: 'flex-start', gap: 6 }}>
+        {/* checkbox on left side of idol bubbles — only in reply-select mode */}
+        {isIdol && isSelectMode && (
           <div onClick={onToggle} style={{
             width: 22, height: 22, borderRadius: 7, marginTop: 18,
             background: selected ? 'var(--pink)' : '#fff',
@@ -98,26 +106,92 @@ function SelectableBubble({ side = 'left', text, idolSide, selected, onToggle, i
             {selected && <Icon.Check s={13} />}
           </div>
         )}
-        <div>
+        <div style={{ position: 'relative' }}>
           {isIdol && (
             <div style={{ fontSize: 10, fontWeight: 700, color: 'var(--pink)', marginBottom: 4, marginLeft: 4, letterSpacing: 0.4 }}>
               IDOL · 对方
             </div>
           )}
-          <div onClick={isIdol ? onToggle : undefined} style={{
-            background: fill, border, borderRadius: 18,
-            padding: image ? 0 : '10px 14px', cursor: isIdol ? 'pointer' : 'default',
-            fontSize: 15, lineHeight: 1.45, color: 'var(--ink)',
-            borderTopLeftRadius: isLeft ? 6 : 18,
-            borderTopRightRadius: isLeft ? 18 : 6,
-            boxShadow: selected ? '0 6px 18px -8px rgba(245,140,160,0.4)' : '0 1px 1px rgba(60,40,50,0.04)',
-            transition: 'all .12s',
-          }}>
+          <div
+            onClick={isIdol && isSelectMode ? onToggle : undefined}
+            style={{
+              background: fill, border, borderRadius: 18,
+              padding: image ? 0 : '10px 14px',
+              cursor: isIdol && isSelectMode ? 'pointer' : 'default',
+              fontSize: 15, lineHeight: 1.45, color: 'var(--ink)',
+              borderTopLeftRadius: isLeft ? 6 : 18,
+              borderTopRightRadius: isLeft ? 18 : 6,
+              boxShadow: (isSelectMode && selected) ? '0 6px 18px -8px rgba(245,140,160,0.4)' : '0 1px 1px rgba(60,40,50,0.04)',
+              transition: 'all .12s',
+            }}>
             {image
               ? <div style={{ width: 140, height: 110, borderRadius: 16, background: 'linear-gradient(135deg, #FBEAE0, #F8D9D0)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#B58474', fontSize: 13, fontWeight: 500 }}>[图片]</div>
               : <span className="ko">{text}</span>}
           </div>
+          {/* floating circular edit / 删除 buttons — only in ocr-edit mode */}
+          {!isSelectMode && (
+            <div style={{
+              position: 'absolute',
+              top: isIdol ? 18 : -6,
+              right: isLeft ? -32 : 'auto',
+              left: isLeft ? 'auto' : -32,
+              display: 'flex', flexDirection: 'column', gap: 6,
+            }}>
+              <div style={{
+                width: 26, height: 26, borderRadius: 13, background: '#fff',
+                border: '1px solid var(--line-2)',
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                color: 'var(--ink-mute)', cursor: 'pointer',
+                boxShadow: '0 1px 2px rgba(60,40,50,0.05)',
+              }}>
+                <Icon.Edit s={12} />
+              </div>
+              <div style={{
+                width: 26, height: 26, borderRadius: 13, background: '#fff',
+                border: '1px solid var(--line-2)',
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                color: 'var(--ink-mute)', cursor: 'pointer',
+                boxShadow: '0 1px 2px rgba(60,40,50,0.05)',
+              }}>
+                <Icon.X s={12} />
+              </div>
+            </div>
+          )}
         </div>
+      </div>
+    </div>
+  );
+}
+
+// ─── Hint card shown at end of bubble list in OCR-edit mode ───
+function BubbleEditHint() {
+  return (
+    <div style={{
+      marginTop: 18, padding: '14px 16px',
+      border: '1.5px dashed var(--pink-soft)', borderRadius: 16,
+      background: 'rgba(255,250,247,0.6)',
+    }}>
+      <div style={{ fontSize: 13, lineHeight: 1.5, marginBottom: 10 }}>
+        <span style={{ color: 'var(--ink-mute)' }}>气泡识别不太准确？</span>
+        <span style={{ color: 'var(--pink-deep)', fontWeight: 600, marginLeft: 6 }}>你可以逐条编辑后再继续</span>
+      </div>
+      <button style={{
+        display: 'inline-flex', alignItems: 'center', gap: 8,
+        background: 'transparent', border: 'none', padding: 0,
+        color: 'var(--pink-deep)', fontSize: 14, fontWeight: 600, cursor: 'pointer',
+      }}>
+        <span style={{
+          width: 22, height: 22, borderRadius: 11,
+          border: '1.5px solid var(--pink)',
+          display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
+          color: 'var(--pink)',
+        }}>
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round"><path d="M12 5v14M5 12h14"/></svg>
+        </span>
+        手动插入一条消息
+      </button>
+      <div style={{ fontSize: 11.5, color: 'var(--ink-faint)', marginTop: 10, lineHeight: 1.5 }}>
+        当前版本中气泡顺序不参与 AI 解析；手动插入默认追加到底部。
       </div>
     </div>
   );
@@ -264,9 +338,18 @@ function HomeScreenV1({ onLearn, onQuickReply }) {
 }
 
 // ─────────────────────────────────────────────────────────────
-// 2. CONFIRM V1 — selectable idol bubbles, toggle, dual CTAs
+// 2. CONFIRM V1 — two modes:
+//    mode='ocr'   → default. confirm OCR text. no checkboxes. edit/删除 per bubble.
+//                   Learn analysis settings (incl. "同时检查我的回复") grouped together.
+//    mode='reply' → entered by tapping 生成回复建议. checkboxes on idol bubbles only.
 // ─────────────────────────────────────────────────────────────
-function ConfirmScreenV1({ idolSide = 'left', setIdolSide, checkMyReplies, setCheckMyReplies, selectedIdolIds, toggleIdol, onAnalyze, onGenReply }) {
+function ConfirmScreenV1({
+  idolSide = 'left', setIdolSide,
+  checkMyReplies, setCheckMyReplies,
+  selectedIdolIds, toggleIdol,
+  onAnalyze, onEnterReplySelect, onCancelReplySelect, onConfirmReply,
+  mode = 'ocr',
+}) {
   const bubbles = [
     { id: 1, side: 'left',  text: '오늘 뭐해? ㅋㅋ' },
     { id: 2, side: 'right', text: '나 지금 공부 중이야' },
@@ -274,110 +357,187 @@ function ConfirmScreenV1({ idolSide = 'left', setIdolSide, checkMyReplies, setCh
     { id: 4, side: 'left',  text: '다들 뭐해?' },
     { id: 5, side: 'right', text: '나는 너를 많이 좋아해요' },
   ];
-  const idolCount = bubbles.filter(b => b.side === idolSide).length;
   const userBubbles = bubbles.filter(b => b.side !== idolSide).length > 0;
   const selectedCount = selectedIdolIds?.length || 0;
+  const isReply = mode === 'reply';
 
   return (
     <div style={{ height: '100%', background: 'var(--bg-page)', position: 'relative', display: 'flex', flexDirection: 'column' }}>
-      <AppNav title="确认聊天内容" back="返回" />
-      <div style={{ flex: 1, overflow: 'auto', padding: '4px 22px 280px' }}>
-        <div style={{
-          background: 'var(--bg-soft)', borderRadius: 14, padding: '10px 12px',
-          fontSize: 12.5, color: '#7A4A55', lineHeight: 1.5, marginBottom: 14,
-          display: 'flex', gap: 10, alignItems: 'flex-start',
-        }}>
-          <div style={{ marginTop: 1, color: 'var(--pink-deep)' }}><Icon.Info s={14} /></div>
-          <div>
-            <div>请确认 OCR 文字。点击 <b>IDOL 气泡</b> 可勾选你想回复的消息。</div>
+      <AppNav
+        title={isReply ? '选择要回复的消息' : '确认聊天内容'}
+        back={isReply ? '取消' : '返回'}
+      />
+      <div style={{ flex: 1, overflow: 'auto', padding: '4px 22px 320px' }}>
+        {/* mode-specific top hint */}
+        {isReply ? (
+          <div style={{
+            background: 'var(--bg-lavender)', borderRadius: 14, padding: '10px 12px',
+            fontSize: 12.5, color: '#5E4C8A', lineHeight: 1.5, marginBottom: 14,
+            display: 'flex', gap: 10, alignItems: 'flex-start',
+          }}>
+            <div style={{ marginTop: 1, color: '#7860B3' }}><Icon.Bubble s={14} /></div>
+            <div>
+              <div style={{ fontWeight: 600, marginBottom: 2 }}>选择你想回复的 IDOL 消息</div>
+              <div style={{ color: '#7C6BA0' }}>可选 1 条或多条，AI 会结合上下文生成回复建议。</div>
+            </div>
           </div>
-        </div>
+        ) : (
+          <div style={{
+            background: 'var(--bg-soft)', borderRadius: 14, padding: '10px 12px',
+            fontSize: 12.5, color: '#7A4A55', lineHeight: 1.5, marginBottom: 14,
+            display: 'flex', gap: 10, alignItems: 'flex-start',
+          }}>
+            <div style={{ marginTop: 1, color: 'var(--pink-deep)' }}><Icon.Info s={14} /></div>
+            <div>
+              <div style={{ fontWeight: 600, marginBottom: 2 }}>确认 OCR 文字是否正确</div>
+              <div style={{ color: '#9A6F7A' }}>学习解析会分析所有对方气泡 · 点击下方按钮编辑或删除单条。</div>
+            </div>
+          </div>
+        )}
 
         <div style={{ padding: '0 4px' }}>
           {bubbles.map(b => (
             <SelectableBubble
               key={b.id} side={b.side} idolSide={idolSide} text={b.text}
+              mode={isReply ? 'reply-select' : 'ocr-edit'}
               selected={selectedIdolIds?.includes(b.id)}
               onToggle={() => toggleIdol?.(b.id)}
             />
           ))}
+          {!isReply && <BubbleEditHint />}
         </div>
       </div>
 
-      {/* bottom sheet */}
+      {/* ─── bottom sheet — varies by mode ─── */}
+      {isReply ? (
+        <ReplySelectBottomBar
+          selectedCount={selectedCount}
+          onCancel={onCancelReplySelect}
+          onConfirm={onConfirmReply}
+        />
+      ) : (
+        <OcrConfirmBottomBar
+          idolSide={idolSide} setIdolSide={setIdolSide}
+          checkMyReplies={checkMyReplies} setCheckMyReplies={setCheckMyReplies}
+          showCheckMy={userBubbles}
+          onAnalyze={onAnalyze}
+          onEnterReplySelect={onEnterReplySelect}
+        />
+      )}
+    </div>
+  );
+}
+
+// ─── Bottom bar A: OCR confirm mode ───
+function OcrConfirmBottomBar({ idolSide, setIdolSide, checkMyReplies, setCheckMyReplies, showCheckMy, onAnalyze, onEnterReplySelect }) {
+  return (
+    <div style={{
+      position: 'absolute', left: 0, right: 0, bottom: 0,
+      padding: '14px 22px 26px',
+      background: 'rgba(255,250,247,0.97)',
+      backdropFilter: 'blur(20px)', WebkitBackdropFilter: 'blur(20px)',
+      borderTop: '0.5px solid var(--line)',
+    }}>
+      {/* side selector */}
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
+        <span style={{ fontSize: 11.5, fontWeight: 700, color: 'var(--ink-2)', letterSpacing: 0.4 }}>IDOL / 对方在</span>
+        <div style={{ display: 'flex', gap: 2, padding: 3, background: '#F2EAEC', borderRadius: 12 }}>
+          {['left', 'right'].map(s => {
+            const on = s === idolSide;
+            return (
+              <div key={s} onClick={() => setIdolSide?.(s)} style={{
+                height: 28, padding: '0 14px', borderRadius: 9,
+                background: on ? '#fff' : 'transparent',
+                boxShadow: on ? '0 1px 4px rgba(60,40,50,0.08)' : 'none',
+                display: 'flex', alignItems: 'center', gap: 4,
+                color: on ? 'var(--pink-deep)' : 'var(--ink-mute)', fontWeight: 600, fontSize: 12.5,
+                cursor: 'pointer',
+              }}>
+                {s === 'left' ? '左侧' : '右侧'}
+              </div>
+            );
+          })}
+        </div>
+      </div>
+
+      {/* Learn analysis settings group */}
       <div style={{
-        position: 'absolute', left: 0, right: 0, bottom: 0,
-        padding: '14px 22px 30px',
-        background: 'rgba(255,250,247,0.97)',
-        backdropFilter: 'blur(20px)', WebkitBackdropFilter: 'blur(20px)',
-        borderTop: '0.5px solid var(--line)',
+        background: 'var(--bg-elev)', border: '1px solid var(--line)',
+        borderRadius: 14, padding: '10px 12px', marginBottom: 10,
       }}>
-        {/* side selector */}
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
-          <span style={{ fontSize: 11.5, fontWeight: 700, color: 'var(--ink-2)', letterSpacing: 0.4 }}>IDOL / 对方在</span>
-          <div style={{ display: 'flex', gap: 2, padding: 3, background: '#F2EAEC', borderRadius: 12 }}>
-            {['left', 'right'].map(s => {
-              const on = s === idolSide;
-              return (
-                <div key={s} onClick={() => setIdolSide?.(s)} style={{
-                  height: 28, padding: '0 14px', borderRadius: 9,
-                  background: on ? '#fff' : 'transparent',
-                  boxShadow: on ? '0 1px 4px rgba(60,40,50,0.08)' : 'none',
-                  display: 'flex', alignItems: 'center', gap: 4,
-                  color: on ? 'var(--pink-deep)' : 'var(--ink-mute)', fontWeight: 600, fontSize: 12.5,
-                  cursor: 'pointer',
-                }}>
-                  {s === 'left' ? '左侧' : '右侧'}
-                </div>
-              );
-            })}
-          </div>
+        <div style={{ fontSize: 10.5, fontWeight: 700, color: 'var(--ink-mute)', letterSpacing: 0.6, marginBottom: showCheckMy ? 8 : 0 }}>
+          学习解析设置
         </div>
-
-        {/* my-reply toggle (only if user bubbles exist) */}
-        {userBubbles && (
-          <div style={{
-            display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-            padding: '10px 12px', background: 'var(--bg-mint)', borderRadius: 12, marginBottom: 12,
-          }}>
-            <Checkbox
-              checked={checkMyReplies}
-              onChange={setCheckMyReplies}
-              label="同时检查我的回复"
-              sublabel="检查你已发出的韩语是否自然"
-            />
-          </div>
+        {showCheckMy && (
+          <Checkbox
+            checked={checkMyReplies}
+            onChange={setCheckMyReplies}
+            label="同时检查我的回复"
+            sublabel="检查你已发出的韩语是否自然"
+          />
         )}
+      </div>
 
-        {/* selection hint */}
-        {selectedCount === 0 ? (
-          <div style={{ fontSize: 11.5, color: 'var(--ink-mute)', marginBottom: 10, textAlign: 'center' }}>
-            点击 IDOL 气泡可勾选 · 点 <b style={{ color: 'var(--pink-deep)' }}>生成回复建议</b> 时需先选择
-          </div>
-        ) : (
-          <div style={{ fontSize: 12, color: 'var(--pink-deep)', marginBottom: 10, textAlign: 'center', fontWeight: 600 }}>
+      {/* Primary: 学习解析 */}
+      <PinkBtn onClick={onAnalyze} leftIcon={<Icon.Sparkle s={18} />} size="md">学习解析</PinkBtn>
+
+      {/* Secondary: 生成回复建议 (separate intent) */}
+      <div style={{ marginTop: 12, display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10 }}>
+        <div>
+          <div style={{ fontSize: 12.5, fontWeight: 600, color: 'var(--ink)' }}>想回复对方？</div>
+          <div style={{ fontSize: 11, color: 'var(--ink-mute)', marginTop: 1 }}>选择消息 · AI 生成韩语回复</div>
+        </div>
+        <button onClick={onEnterReplySelect} style={{
+          height: 38, padding: '0 14px', borderRadius: 12, border: '1.5px solid var(--lavender-soft)',
+          background: '#fff', color: '#7860B3',
+          fontWeight: 600, fontSize: 13, cursor: 'pointer',
+          display: 'inline-flex', alignItems: 'center', gap: 6, flexShrink: 0,
+        }}>
+          <Icon.Bubble s={14} />生成回复建议
+        </button>
+      </div>
+    </div>
+  );
+}
+
+// ─── Bottom bar B: reply-selection mode ───
+function ReplySelectBottomBar({ selectedCount, onCancel, onConfirm }) {
+  const has = selectedCount > 0;
+  return (
+    <div style={{
+      position: 'absolute', left: 0, right: 0, bottom: 0,
+      padding: '14px 22px 26px',
+      background: 'rgba(248,245,255,0.97)',
+      backdropFilter: 'blur(20px)', WebkitBackdropFilter: 'blur(20px)',
+      borderTop: '0.5px solid var(--lavender-soft)',
+    }}>
+      <div style={{ textAlign: 'center', marginBottom: 12, minHeight: 18 }}>
+        {has ? (
+          <span style={{ fontSize: 13, fontWeight: 600, color: '#7860B3' }}>
             ✓ 已选 {selectedCount} 条 IDOL 消息
-          </div>
+          </span>
+        ) : (
+          <span style={{ fontSize: 12, color: 'var(--ink-mute)' }}>
+            点击 IDOL 气泡选择 · 至少选 1 条
+          </span>
         )}
-
-        {/* CTAs */}
-        <div style={{ display: 'flex', gap: 10 }}>
-          <div style={{ flex: 1.4 }}>
-            <PinkBtn onClick={onAnalyze} leftIcon={<Icon.Sparkle s={18} />} size="md">学习解析</PinkBtn>
-          </div>
-          <div style={{ flex: 1 }}>
-            <button onClick={onGenReply} disabled={selectedCount === 0} style={{
-              width: '100%', height: 46, borderRadius: 18, border: 'none',
-              background: selectedCount > 0 ? '#7860B3' : '#E5DFEE',
-              color: '#fff', fontWeight: 600, fontSize: 14,
-              cursor: selectedCount > 0 ? 'pointer' : 'default',
-              display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 6,
-              boxShadow: selectedCount > 0 ? '0 6px 16px -4px rgba(120,96,179,0.45)' : 'none',
-            }}>
-              <Icon.Bubble s={14} />生成回复建议
-            </button>
-          </div>
-        </div>
+      </div>
+      <div style={{ display: 'flex', gap: 10 }}>
+        <button onClick={onCancel} style={{
+          flex: 0.8, height: 46, borderRadius: 18,
+          background: '#fff', border: '1.5px solid var(--line-2)',
+          color: 'var(--ink-2)', fontSize: 14, fontWeight: 600, cursor: 'pointer',
+        }}>取消</button>
+        <button onClick={onConfirm} disabled={!has} style={{
+          flex: 1.6, height: 46, borderRadius: 18, border: 'none',
+          background: has ? '#7860B3' : '#E5DFEE',
+          color: '#fff', fontWeight: 600, fontSize: 14,
+          cursor: has ? 'pointer' : 'default',
+          display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 6,
+          boxShadow: has ? '0 6px 16px -4px rgba(120,96,179,0.45)' : 'none',
+        }}>
+          <Icon.Sparkle s={14} />确认生成回复
+        </button>
       </div>
     </div>
   );

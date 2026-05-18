@@ -70,22 +70,9 @@ struct VocabFlashcardView: View {
                 )
                 .clipShape(RoundedRectangle(cornerRadius: 14))
 
-            // Example sentence
-            Text("AI 例句")
-                .font(.system(size: 10.5, weight: .bold))
-                .foregroundStyle(Color.inkMute)
-                .tracking(0.6)
+            // Example sentence (lavender callout)
+            aiExampleCallout(examples: [(ko: card.exampleSentence, zh: card.exampleTranslationZH)])
                 .padding(.top, 14)
-                .padding(.bottom, 6)
-
-            Text(card.exampleSentence)
-                .font(.system(size: 15, weight: .medium))
-                .foregroundStyle(Color.ink)
-
-            Text(card.exampleTranslationZH)
-                .font(.system(size: 13))
-                .foregroundStyle(Color.inkMute)
-                .padding(.top, 2)
 
             // Usage note
             Text("用法笔记")
@@ -125,7 +112,7 @@ struct GrammarFlashcardView: View {
         VStack(alignment: .leading, spacing: 0) {
             // Header
             HStack {
-                Text("GRAMMAR · 语法")
+                Text("GRAMMAR · 语法 / 词尾")
                     .font(.system(size: 10, weight: .bold))
                     .tracking(0.8)
                     .padding(.horizontal, 10)
@@ -182,31 +169,16 @@ struct GrammarFlashcardView: View {
                 )
                 .clipShape(RoundedRectangle(cornerRadius: 14))
 
-            // Example sentences
-            Text("例句")
+            // AI example sentences (lavender callout)
+            aiExampleCallout(examples: card.exampleSentences)
+                .padding(.top, 14)
+
+            // Usage context
+            Text("适合关系 / 场景")
                 .font(.system(size: 10.5, weight: .bold))
                 .foregroundStyle(Color.inkMute)
                 .tracking(0.6)
                 .padding(.top, 14)
-                .padding(.bottom, 6)
-
-            ForEach(Array(card.exampleSentences.enumerated()), id: \.offset) { _, example in
-                Text(example.ko)
-                    .font(.system(size: 15, weight: .medium))
-                    .foregroundStyle(Color.ink)
-                Text(example.zh)
-                    .font(.system(size: 13))
-                    .foregroundStyle(Color.inkMute)
-                    .padding(.top, 2)
-                    .padding(.bottom, 8)
-            }
-
-            // Usage context
-            Text("使用场景")
-                .font(.system(size: 10.5, weight: .bold))
-                .foregroundStyle(Color.inkMute)
-                .tracking(0.6)
-                .padding(.top, 10)
                 .padding(.bottom, 4)
 
             Text(card.usageContext)
@@ -240,4 +212,67 @@ struct GrammarFlashcardView: View {
         .padding()
     }
     .background(Color.bgPage)
+}
+
+// MARK: - AI Example Callout (lavender box per V1 design)
+
+@ViewBuilder
+func aiExampleCallout(examples: [(ko: String, zh: String)]) -> some View {
+    VStack(alignment: .leading, spacing: 0) {
+        HStack(spacing: 6) {
+            Image(systemName: "sparkle")
+                .font(.system(size: 12, weight: .semibold))
+                .foregroundStyle(Color(hex: "7860B3"))
+            Text("AI 例句")
+                .font(.system(size: 10.5, weight: .bold))
+                .tracking(0.6)
+                .foregroundStyle(Color(hex: "7860B3"))
+            Spacer()
+            if let first = examples.first {
+                Button {
+                    UIPasteboard.general.string = first.ko
+                } label: {
+                    HStack(spacing: 4) {
+                        Image(systemName: "doc.on.doc")
+                            .font(.system(size: 10, weight: .semibold))
+                        Text("复制")
+                            .font(.system(size: 11.5, weight: .semibold))
+                    }
+                    .foregroundStyle(Color.ink2)
+                    .padding(.horizontal, 10)
+                    .frame(height: 26)
+                    .background(.white)
+                    .clipShape(Capsule())
+                    .overlay(Capsule().stroke(Color.line2, lineWidth: 1))
+                }
+                .buttonStyle(.plain)
+            }
+        }
+        .padding(.bottom, 8)
+
+        ForEach(Array(examples.enumerated()), id: \.offset) { index, example in
+            if index > 0 {
+                Rectangle()
+                    .fill(Color.lavenderSoft)
+                    .frame(height: 1)
+                    .padding(.vertical, 10)
+            }
+            Text(example.ko)
+                .font(.system(size: 15.5, weight: .semibold))
+                .foregroundStyle(Color.ink)
+                .lineSpacing(3)
+            Text(example.zh)
+                .font(.system(size: 12.5))
+                .foregroundStyle(Color.ink2)
+                .padding(.top, 2)
+        }
+    }
+    .padding(14)
+    .frame(maxWidth: .infinity, alignment: .leading)
+    .background(Color.bgLavender)
+    .clipShape(RoundedRectangle(cornerRadius: 16))
+    .overlay(
+        RoundedRectangle(cornerRadius: 16)
+            .stroke(Color.lavenderSoft, style: StrokeStyle(lineWidth: 1, dash: [4, 3]))
+    )
 }
