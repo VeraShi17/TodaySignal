@@ -221,9 +221,34 @@ struct ReplySuggestionView: View {
             loadingSection
                 .padding(.top, 22)
         } else if let errorMessage = appState.replyGenerationError {
-            Text(errorMessage)
-                .font(.system(size: 12.5))
-                .foregroundStyle(Color(hex: "B34A5E"))
+            VStack(alignment: .leading, spacing: 8) {
+                Text("生成失败，可重试")
+                    .font(.system(size: 12.5, weight: .semibold))
+                    .foregroundStyle(Color(hex: "B34A5E"))
+
+                Text(errorMessage)
+                    .font(.system(size: 12))
+                    .foregroundStyle(Color.inkMute)
+                    .lineSpacing(3)
+
+                Button {
+                    Task { await appState.generateReplySuggestions() }
+                } label: {
+                    HStack(spacing: 4) {
+                        Image(systemName: "arrow.clockwise")
+                            .font(.system(size: 11, weight: .semibold))
+                        Text("重试生成")
+                            .font(.system(size: 12.5, weight: .semibold))
+                    }
+                    .foregroundStyle(Color(hex: "B34A5E"))
+                    .padding(.horizontal, 10)
+                    .frame(height: 30)
+                    .background(.white)
+                    .clipShape(Capsule())
+                    .overlay(Capsule().stroke(Color.line2, lineWidth: 1))
+                }
+                .buttonStyle(.plain)
+            }
                 .padding(.horizontal, 12)
                 .padding(.vertical, 10)
                 .background(Color.bgSoft)

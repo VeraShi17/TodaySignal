@@ -6,14 +6,36 @@
 	objectVersion = 77;
 	objects = {
 
+/* Begin PBXBuildFile section */
+		D1D637C82FBB61970059BDA7 /* XCTest.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = D1D637C72FBB61970059BDA7 /* XCTest.framework */; platformFilter = ios; };
+/* End PBXBuildFile section */
+
+/* Begin PBXContainerItemProxy section */
+		D1D637572FBB5CE90059BDA7 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = D1B2A29F2FB87914008D7BC9 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = D1B2A2A62FB87914008D7BC9;
+			remoteInfo = TodaySignal;
+		};
+/* End PBXContainerItemProxy section */
+
 /* Begin PBXFileReference section */
 		D1B2A2A72FB87914008D7BC9 /* TodaySignal.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = TodaySignal.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		D1D6374E2FBB5C790059BDA7 /* ServiceContractsTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ServiceContractsTests.swift; sourceTree = "<group>"; };
+		D1D637532FBB5CE90059BDA7 /* TodaySignalTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = TodaySignalTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
+		D1D637C72FBB61970059BDA7 /* XCTest.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = XCTest.framework; path = Platforms/iPhoneOS.platform/Developer/Library/Frameworks/XCTest.framework; sourceTree = DEVELOPER_DIR; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedRootGroup section */
 		D1B2A2A92FB87914008D7BC9 /* TodaySignal */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
 			path = TodaySignal;
+			sourceTree = "<group>";
+		};
+		D1D637542FBB5CE90059BDA7 /* TodaySignalTests */ = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			path = TodaySignalTests;
 			sourceTree = "<group>";
 		};
 /* End PBXFileSystemSynchronizedRootGroup section */
@@ -26,6 +48,14 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
+		D1D637502FBB5CE90059BDA7 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				D1D637C82FBB61970059BDA7 /* XCTest.framework in Frameworks */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 /* End PBXFrameworksBuildPhase section */
 
 /* Begin PBXGroup section */
@@ -33,7 +63,10 @@
 			isa = PBXGroup;
 			children = (
 				D1B2A2A92FB87914008D7BC9 /* TodaySignal */,
+				D1D637542FBB5CE90059BDA7 /* TodaySignalTests */,
 				D1B2A2A82FB87914008D7BC9 /* Products */,
+				D1D6374D2FBB5C510059BDA7 /* TodaySignalTests */,
+				D1D637C62FBB61970059BDA7 /* Frameworks */,
 			);
 			sourceTree = "<group>";
 		};
@@ -41,8 +74,25 @@
 			isa = PBXGroup;
 			children = (
 				D1B2A2A72FB87914008D7BC9 /* TodaySignal.app */,
+				D1D637532FBB5CE90059BDA7 /* TodaySignalTests.xctest */,
 			);
 			name = Products;
+			sourceTree = "<group>";
+		};
+		D1D6374D2FBB5C510059BDA7 /* TodaySignalTests */ = {
+			isa = PBXGroup;
+			children = (
+				D1D6374E2FBB5C790059BDA7 /* ServiceContractsTests.swift */,
+			);
+			path = TodaySignalTests;
+			sourceTree = "<group>";
+		};
+		D1D637C62FBB61970059BDA7 /* Frameworks */ = {
+			isa = PBXGroup;
+			children = (
+				D1D637C72FBB61970059BDA7 /* XCTest.framework */,
+			);
+			name = Frameworks;
 			sourceTree = "<group>";
 		};
 /* End PBXGroup section */
@@ -70,6 +120,29 @@
 			productReference = D1B2A2A72FB87914008D7BC9 /* TodaySignal.app */;
 			productType = "com.apple.product-type.application";
 		};
+		D1D637522FBB5CE90059BDA7 /* TodaySignalTests */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = D1D637592FBB5CE90059BDA7 /* Build configuration list for PBXNativeTarget "TodaySignalTests" */;
+			buildPhases = (
+				D1D6374F2FBB5CE90059BDA7 /* Sources */,
+				D1D637502FBB5CE90059BDA7 /* Frameworks */,
+				D1D637512FBB5CE90059BDA7 /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+				D1D637582FBB5CE90059BDA7 /* PBXTargetDependency */,
+			);
+			fileSystemSynchronizedGroups = (
+				D1D637542FBB5CE90059BDA7 /* TodaySignalTests */,
+			);
+			name = TodaySignalTests;
+			packageProductDependencies = (
+			);
+			productName = TodaySignalTests;
+			productReference = D1D637532FBB5CE90059BDA7 /* TodaySignalTests.xctest */;
+			productType = "com.apple.product-type.bundle.unit-test";
+		};
 /* End PBXNativeTarget section */
 
 /* Begin PBXProject section */
@@ -77,11 +150,15 @@
 			isa = PBXProject;
 			attributes = {
 				BuildIndependentTargetsInParallel = 1;
-				LastSwiftUpdateCheck = 2630;
+				LastSwiftUpdateCheck = 2650;
 				LastUpgradeCheck = 2630;
 				TargetAttributes = {
 					D1B2A2A62FB87914008D7BC9 = {
 						CreatedOnToolsVersion = 26.3;
+					};
+					D1D637522FBB5CE90059BDA7 = {
+						CreatedOnToolsVersion = 26.5;
+						TestTargetID = D1B2A2A62FB87914008D7BC9;
 					};
 				};
 			};
@@ -100,12 +177,20 @@
 			projectRoot = "";
 			targets = (
 				D1B2A2A62FB87914008D7BC9 /* TodaySignal */,
+				D1D637522FBB5CE90059BDA7 /* TodaySignalTests */,
 			);
 		};
 /* End PBXProject section */
 
 /* Begin PBXResourcesBuildPhase section */
 		D1B2A2A52FB87914008D7BC9 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		D1D637512FBB5CE90059BDA7 /* Resources */ = {
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
@@ -122,7 +207,22 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
+		D1D6374F2FBB5CE90059BDA7 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 /* End PBXSourcesBuildPhase section */
+
+/* Begin PBXTargetDependency section */
+		D1D637582FBB5CE90059BDA7 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = D1B2A2A62FB87914008D7BC9 /* TodaySignal */;
+			targetProxy = D1D637572FBB5CE90059BDA7 /* PBXContainerItemProxy */;
+		};
+/* End PBXTargetDependency section */
 
 /* Begin XCBuildConfiguration section */
 		D1B2A2B02FB87916008D7BC9 /* Debug */ = {
@@ -310,6 +410,45 @@
 			};
 			name = Release;
 		};
+		D1D6375A2FBB5CE90059BDA7 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = NTK4K4DD48;
+				GENERATE_INFOPLIST_FILE = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 26.2;
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.verashi.TodaySignalTests;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				STRING_CATALOG_GENERATE_SYMBOLS = NO;
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
+				SWIFT_EMIT_LOC_STRINGS = NO;
+				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/TodaySignal.app/$(BUNDLE_EXECUTABLE_FOLDER_PATH)/TodaySignal";
+				x = "";
+			};
+			name = Release;
+		};
+		D1D637C52FBB5EDB0059BDA7 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				COPY_PHASE_STRIP = NO;
+				GCC_DYNAMIC_NO_PIC = NO;
+				GCC_OPTIMIZATION_LEVEL = 0;
+				GENERATE_INFOPLIST_FILE = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 26.2;
+				PRODUCT_NAME = TodaySignalTests;
+				SWIFT_VERSION = 5.0;
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/TodaySignal.app/$(BUNDLE_EXECUTABLE_FOLDER_PATH)/TodaySignal";
+				x = "";
+			};
+			name = Debug;
+		};
 /* End XCBuildConfiguration section */
 
 /* Begin XCConfigurationList section */
@@ -327,6 +466,15 @@
 			buildConfigurations = (
 				D1B2A2B32FB87916008D7BC9 /* Debug */,
 				D1B2A2B42FB87916008D7BC9 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		D1D637592FBB5CE90059BDA7 /* Build configuration list for PBXNativeTarget "TodaySignalTests" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				D1D6375A2FBB5CE90059BDA7 /* Release */,
+				D1D637C52FBB5EDB0059BDA7 /* Debug */,
 			);
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;

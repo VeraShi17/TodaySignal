@@ -218,6 +218,11 @@ struct GrammarFlashcardView: View {
 
 @ViewBuilder
 func aiExampleCallout(examples: [(ko: String, zh: String)]) -> some View {
+    let sanitizedExamples = examples
+        .map { (ko: $0.ko.trimmingCharacters(in: .whitespacesAndNewlines), zh: $0.zh.trimmingCharacters(in: .whitespacesAndNewlines)) }
+        .filter { !$0.ko.isEmpty }
+    let firstCopyableKo = sanitizedExamples.first?.ko
+
     VStack(alignment: .leading, spacing: 0) {
         HStack(spacing: 6) {
             Image(systemName: "sparkle")
@@ -228,9 +233,9 @@ func aiExampleCallout(examples: [(ko: String, zh: String)]) -> some View {
                 .tracking(0.6)
                 .foregroundStyle(Color(hex: "7860B3"))
             Spacer()
-            if let first = examples.first {
+            if let firstCopyableKo {
                 Button {
-                    UIPasteboard.general.string = first.ko
+                    UIPasteboard.general.string = firstCopyableKo
                 } label: {
                     HStack(spacing: 4) {
                         Image(systemName: "doc.on.doc")
@@ -250,21 +255,49 @@ func aiExampleCallout(examples: [(ko: String, zh: String)]) -> some View {
         }
         .padding(.bottom, 8)
 
-        ForEach(Array(examples.enumerated()), id: \.offset) { index, example in
-            if index > 0 {
-                Rectangle()
-                    .fill(Color.lavenderSoft)
-                    .frame(height: 1)
-                    .padding(.vertical, 10)
-            }
-            Text(example.ko)
-                .font(.system(size: 15.5, weight: .semibold))
-                .foregroundStyle(Color.ink)
-                .lineSpacing(3)
-            Text(example.zh)
+        if sanitizedExamples.isEmpty {
+            Text("例句暂未生成完成")
+                .font(.system(size: 14.5, weight: .semibold))
+                .foregroundStyle(Color.inkMute)
+            Text("稍后可在卡片库重新查看，系统会展示可用例句。")
                 .font(.system(size: 12.5))
                 .foregroundStyle(Color.ink2)
                 .padding(.top, 2)
+        } else {
+            ForEach(Array(sanitizedExamples.enumerated()), id: \.offset) { index, example in
+                if index > 0 {
+                    Rectangle()
+                        .fill(Color.lavenderSoft)
+                        .frame(height: 1)
+                        .padding(.vertical, 10)
+                }
+                HStack(alignment: .top, spacing: 8) {
+                    Text(example.ko)
+                        .font(.system(size: 15.5, weight: .semibold))
+                        .foregroundStyle(Color.ink)
+                        .lineSpacing(3)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+
+                    Button {
+                        UIPasteboard.general.string = example.ko
+                    } label: {
+                        Image(systemName: "doc.on.doc")
+                            .font(.system(size: 11, weight: .semibold))
+                            .foregroundStyle(Color.inkMute)
+                            .frame(width: 24, height: 24)
+                            .background(.white)
+                            .clipShape(Circle())
+                            .overlay(Circle().stroke(Color.line2, lineWidth: 1))
+                    }
+                    .buttonStyle(.plain)
+                }
+                if !example.zh.isEmpty {
+                    Text(example.zh)
+                        .font(.system(size: 12.5))
+                        .foregroundStyle(Color.ink2)
+                        .padding(.top, 2)
+                }
+            }
         }
     }
     .padding(14)

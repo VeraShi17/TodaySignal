@@ -4,6 +4,9 @@ struct CardPreviewModal: View {
     var vocabCard: VocabularyCard?
     var grammarCard: GrammarCard?
     var isLoadingExamples: Bool = false
+    var isRetryingExamples: Bool = false
+    var exampleErrorMessage: String?
+    var onRetryExamples: (() -> Void)?
     var onDismiss: () -> Void
     var onGoToLibrary: () -> Void
 
@@ -47,6 +50,41 @@ struct CardPreviewModal: View {
                         GrammarFlashcardView(card: grammarCard)
                     }
 
+                    if !isLoadingExamples, let onRetryExamples {
+                        VStack(alignment: .leading, spacing: 8) {
+                            if let exampleErrorMessage, !exampleErrorMessage.isEmpty {
+                                Text(exampleErrorMessage)
+                                    .font(.system(size: 12))
+                                    .foregroundStyle(Color(hex: "B34A5E"))
+                            }
+                            Button {
+                                onRetryExamples()
+                            } label: {
+                                HStack(spacing: 6) {
+                                    if isRetryingExamples {
+                                        ProgressView()
+                                            .controlSize(.small)
+                                    } else {
+                                        Image(systemName: "arrow.clockwise")
+                                            .font(.system(size: 12, weight: .semibold))
+                                    }
+                                    Text(isRetryingExamples ? "正在重试例句…" : "重试生成例句")
+                                        .font(.system(size: 13, weight: .semibold))
+                                }
+                                .foregroundStyle(Color(hex: "7860B3"))
+                                .padding(.horizontal, 12)
+                                .frame(height: 34)
+                                .background(.white)
+                                .clipShape(Capsule())
+                                .overlay(Capsule().stroke(Color.lavenderSoft, lineWidth: 1))
+                            }
+                            .buttonStyle(.plain)
+                            .disabled(isRetryingExamples)
+                        }
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .padding(.top, 12)
+                    }
+
                     // Action buttons
                     HStack(spacing: 10) {
                         PrimaryButton(title: "知道了", action: onDismiss)
@@ -68,6 +106,9 @@ struct CardPreviewModal: View {
     CardPreviewModal(
         vocabCard: MockData.vocabularyCards[0],
         isLoadingExamples: true,
+        isRetryingExamples: false,
+        exampleErrorMessage: nil,
+        onRetryExamples: {},
         onDismiss: {},
         onGoToLibrary: {}
     )

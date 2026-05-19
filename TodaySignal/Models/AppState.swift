@@ -35,6 +35,7 @@ class AppState {
     var retryingResultIDs: Set<UUID> = []
 
     var myReplyCheckResults: [ReplyCheckResult] = []
+    var retryingReplyCheckBubbleIDs: Set<UUID> = []
     /// Per-bubble feedback chat threads keyed by AnalysisResult.id.
     /// V1 keeps these in-memory only; never persisted.
     var feedbackThreads: [UUID: [FeedbackMessage]] = [:]
@@ -100,6 +101,8 @@ class AppState {
     var previewVocabCard: VocabularyCard?
     var previewGrammarCard: GrammarCard?
     var isCardPreviewLoadingExamples = false
+    var isRetryingCardPreviewExamples = false
+    var cardPreviewExampleErrorMessage: String?
     var savingKnowledgePointIDs: Set<UUID> = []
 
     // MARK: - Actions
@@ -215,8 +218,79 @@ class AppState {
         do {
             let results = try await replyCheckService.checkReplies(myBubbles: myBubbles, idolContext: idolBubbles)
             myReplyCheckResults = results
+        } catch let error as ReplyCheckError {
+            let message = error.errorDescription ?? "我的回复检查失败，请稍后重试。"
+            myReplyCheckResults = myBubbles.map { bubble in
+                ReplyCheckResult(
+                    bubbleID: bubble.id,
+                    originalReply: bubble.text,
+                    status: .natural,
+                    feedbackZh: "暂时未能完成这条回复检查。",
+                    issueZh: nil,
+                    suggestedReplyKo: nil,
+                    suggestedReplyZh: nil,
+                    failureMessage: message
+                )
+            }
         } catch {
-            myReplyCheckResults = []
+            myReplyCheckResults = myBubbles.map { bubble in
+                ReplyCheckResult(
+                    bubbleID: bubble.id,
+                    originalReply: bubble.text,
+                    status: .natural,
+                    feedbackZh: "暂时未能完成这条回复检查。",
+                    issueZh: nil,
+                    suggestedReplyKo: nil,
+                    suggestedReplyZh: nil,
+                    failureMessage: "我的回复检查失败，请稍后重试。"
+                )
+            }
+        }
+    }
+
+    @MainActor
+    func retryMyReplyCheck(for bubbleID: UUID) async {
+        guard let bubble = chatBubbles.first(where: { $0.id == bubbleID && $0.side != idolSide && $0.type == .text }) else { return }
+        guard !retryingReplyCheckBubbleIDs.contains(bubbleID) else { return }
+
+        retryingReplyCheckBubbleIDs.insert(bubbleID)
+        defer { retryingReplyCheckBubbleIDs.remove(bubbleID) }
+
+        let idolBubbles = chatBubbles.filter { $0.side == idolSide && $0.type == .text }
+
+        do {
+            let retried = try await replyCheckService.checkReplies(myBubbles: [bubble], idolContext: idolBubbles)
+            guard let first = retried.first else { return }
+            if let index = myReplyCheckResults.firstIndex(where: { $0.bubbleID == bubbleID }) {
+                myReplyCheckResults[index] = first
+            }
+        } catch let error as ReplyCheckError {
+            let message = error.errorDescription ?? "我的回复检查失败，请稍后重试。"
+            if let index = myReplyCheckResults.firstIndex(where: { $0.bubbleID == bubbleID }) {
+                myReplyCheckResults[index] = ReplyCheckResult(
+                    bubbleID: bubbleID,
+                    originalReply: bubble.text,
+                    status: .natural,
+                    feedbackZh: "暂时未能完成这条回复检查。",
+                    issueZh: nil,
+                    suggestedReplyKo: nil,
+                    suggestedReplyZh: nil,
+                    failureMessage: message
+                )
+            }
+        } catch {
+            if let index = myReplyCheckResults.firstIndex(where: { $0.bubbleID == bubbleID }) {
+                myReplyCheckResults[index] = ReplyCheckResult(
+                    bubbleID: bubbleID,
+                    originalReply: bubble.text,
+                    status: .natural,
+                    feedbackZh: "暂时未能完成这条回复检查。",
+                    issueZh: nil,
+                    suggestedReplyKo: nil,
+                    suggestedReplyZh: nil,
+                    failureMessage: "我的回复检查失败，请稍后重试。"
+                )
+            }
         }
     }
 
@@ -334,6 +408,7 @@ class AppState {
                 previewVocabCard = placeholderCard
                 previewGrammarCard = nil
                 isCardPreviewLoadingExamples = true
+                cardPreviewExampleErrorMessage = nil
                 showCardPreview = true
 
                 Task { @MainActor in
@@ -375,6 +450,7 @@ class AppState {
                 previewGrammarCard = placeholderCard
                 previewVocabCard = nil
                 isCardPreviewLoadingExamples = true
+                cardPreviewExampleErrorMessage = nil
                 showCardPreview = true
 
                 Task { @MainActor in
@@ -429,7 +505,10 @@ class AppState {
         isGeneratingReply = false
         replyGenerationError = nil
         myReplyCheckResults = []
+        retryingReplyCheckBubbleIDs = []
         savingKnowledgePointIDs = []
+        isRetryingCardPreviewExamples = false
+        cardPreviewExampleErrorMessage = nil
         feedbackThreads = [:]
         feedbackSendingForResultID = nil
         feedbackErrors = [:]
@@ -623,6 +702,81 @@ class AppState {
             }
 
             return updated
+        }
+    }
+
+    @MainActor
+    func retryPreviewCardExamples() async {
+        guard !isCardPreviewLoadingExamples, !isRetryingCardPreviewExamples else { return }
+        guard previewVocabCard != nil || previewGrammarCard != nil else { return }
+
+        isRetryingCardPreviewExamples = true
+        cardPreviewExampleErrorMessage = nil
+        defer { isRetryingCardPreviewExamples = false }
+
+        #if DEBUG
+        DebugTelemetry.increment(.cardExampleRequestTotal)
+        #endif
+
+        if let card = previewVocabCard {
+            do {
+                let example = try await cardExampleService.vocabularyExample(
+                    term: card.word,
+                    originalSentence: card.originalSentence
+                )
+                let updated = VocabularyCard(
+                    id: card.id,
+                    word: card.word,
+                    meaningZH: card.meaningZH,
+                    pronunciation: card.pronunciation,
+                    partOfSpeech: card.partOfSpeech,
+                    originalSentence: card.originalSentence,
+                    exampleSentence: example.ko,
+                    exampleTranslationZH: example.zh,
+                    usageNote: card.usageNote,
+                    sourcePointId: card.sourcePointId
+                )
+                previewVocabCard = updated
+                if let index = vocabularyCards.firstIndex(where: { $0.id == card.id }) {
+                    vocabularyCards[index] = updated
+                    persistCards()
+                }
+            } catch {
+                #if DEBUG
+                DebugTelemetry.increment(.cardExampleFallbackTotal)
+                #endif
+                cardPreviewExampleErrorMessage = "例句重试失败，请稍后再试。"
+            }
+            return
+        }
+
+        if let card = previewGrammarCard {
+            do {
+                let examples = try await cardExampleService.grammarExamples(
+                    point: card.point,
+                    originalSentence: card.originalSentence
+                )
+                let updated = GrammarCard(
+                    id: card.id,
+                    point: card.point,
+                    meaningZH: card.meaningZH,
+                    toneNote: card.toneNote,
+                    originalSentence: card.originalSentence,
+                    exampleSentences: examples,
+                    usageContext: card.usageContext,
+                    sourcePointId: card.sourcePointId
+                )
+                previewGrammarCard = updated
+                if let index = grammarCards.firstIndex(where: { $0.id == card.id }) {
+                    grammarCards[index] = updated
+                    persistCards()
+                }
+            } catch {
+                #if DEBUG
+                DebugTelemetry.increment(.cardExampleFallbackTotal)
+                #endif
+                cardPreviewExampleErrorMessage = "例句重试失败，请稍后再试。"
+            }
         }
     }
 

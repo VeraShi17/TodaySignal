@@ -138,13 +138,20 @@ struct AnalysisResultView: View {
                 vocabCard: appState.previewVocabCard,
                 grammarCard: appState.previewGrammarCard,
                 isLoadingExamples: appState.isCardPreviewLoadingExamples,
+                isRetryingExamples: appState.isRetryingCardPreviewExamples,
+                exampleErrorMessage: appState.cardPreviewExampleErrorMessage,
+                onRetryExamples: {
+                    Task { await appState.retryPreviewCardExamples() }
+                },
                 onDismiss: {
                     appState.showCardPreview = false
                     appState.isCardPreviewLoadingExamples = false
+                    appState.cardPreviewExampleErrorMessage = nil
                 },
                 onGoToLibrary: {
                     appState.showCardPreview = false
                     appState.isCardPreviewLoadingExamples = false
+                    appState.cardPreviewExampleErrorMessage = nil
                     onDone()
                 }
             )
@@ -168,7 +175,10 @@ struct AnalysisResultView: View {
 
     @ViewBuilder
     private func myReplyCheckCard(_ check: ReplyCheckResult) -> some View {
+        let isFailed = check.failureMessage != nil
         let isNatural = check.status == .natural
+        let bubbleID = check.bubbleID
+        let isRetrying = bubbleID.map { appState.retryingReplyCheckBubbleIDs.contains($0) } ?? false
 
         VStack(alignment: .leading, spacing: 10) {
             HStack(spacing: 6) {
@@ -181,10 +191,14 @@ struct AnalysisResultView: View {
                     .background(Color.bgMint)
                     .clipShape(Capsule())
 
-                TonePillView(
-                    text: isNatural ? "✓ 表达自然" : "可以更自然一点",
-                    kind: isNatural ? .mint : .cream
-                )
+                if isFailed {
+                    TonePillView(text: "检查失败", kind: .cream)
+                } else {
+                    TonePillView(
+                        text: isNatural ? "✓ 表达自然" : "可以更自然一点",
+                        kind: isNatural ? .mint : .cream
+                    )
+                }
                 Spacer()
             }
 
@@ -201,12 +215,52 @@ struct AnalysisResultView: View {
                         .stroke(Color.line, lineWidth: 1)
                 )
 
-            Text(check.feedbackZh)
-                .font(.system(size: 13))
-                .foregroundStyle(Color.ink2)
-                .lineSpacing(4)
+            if isFailed, let failureMessage = check.failureMessage {
+                VStack(alignment: .leading, spacing: 8) {
+                    Text("这条回复暂时没检查成功，可单独重试。")
+                        .font(.system(size: 13))
+                        .foregroundStyle(Color.ink2)
+                        .lineSpacing(4)
+                    Text(failureMessage)
+                        .font(.system(size: 12))
+                        .foregroundStyle(Color.inkMute)
+                    if let bubbleID {
+                        Button {
+                            Task { await appState.retryMyReplyCheck(for: bubbleID) }
+                        } label: {
+                            HStack(spacing: 4) {
+                                if isRetrying {
+                                    ProgressView()
+                                        .controlSize(.small)
+                                } else {
+                                    Image(systemName: "arrow.clockwise")
+                                        .font(.system(size: 11, weight: .semibold))
+                                }
+                                Text(isRetrying ? "重试中…" : "重试这条")
+                                    .font(.system(size: 12.5, weight: .semibold))
+                            }
+                            .foregroundStyle(Color(hex: "B34A5E"))
+                            .padding(.horizontal, 10)
+                            .frame(height: 30)
+                            .background(.white)
+                            .clipShape(Capsule())
+                            .overlay(Capsule().stroke(Color.line2, lineWidth: 1))
+                        }
+                        .buttonStyle(.plain)
+                        .disabled(isRetrying)
+                    }
+                }
+                .padding(12)
+                .background(Color.bgSoft)
+                .clipShape(RoundedRectangle(cornerRadius: 14))
+            } else {
+                Text(check.feedbackZh)
+                    .font(.system(size: 13))
+                    .foregroundStyle(Color.ink2)
+                    .lineSpacing(4)
+            }
 
-            if !isNatural, let suggestedKo = check.suggestedReplyKo {
+            if !isFailed, !isNatural, let suggestedKo = check.suggestedReplyKo {
                 VStack(alignment: .leading, spacing: 6) {
                     HStack {
                         Text("更自然的说法")
@@ -259,7 +313,7 @@ struct AnalysisResultView: View {
         .clipShape(RoundedRectangle(cornerRadius: 18))
         .overlay(
             RoundedRectangle(cornerRadius: 18)
-                .stroke(isNatural ? Color.mintSoft : Color.pinkSoft, lineWidth: 1)
+                .stroke(isFailed ? Color.pinkSoft : (isNatural ? Color.mintSoft : Color.pinkSoft), lineWidth: 1)
         )
     }
 
@@ -337,14 +391,40 @@ struct AnalysisResultView: View {
                     }
 
                     if let errorMessage {
-                        Text(errorMessage)
-                            .font(.system(size: 12.5))
-                            .foregroundStyle(Color(hex: "B34A5E"))
-                            .padding(.horizontal, 12)
-                            .padding(.vertical, 10)
-                            .frame(maxWidth: .infinity, alignment: .leading)
-                            .background(Color.bgSoft)
-                            .clipShape(RoundedRectangle(cornerRadius: 12))
+                        VStack(alignment: .leading, spacing: 8) {
+                            Text("追问失败，可重试")
+                                .font(.system(size: 12.5, weight: .semibold))
+                                .foregroundStyle(Color(hex: "B34A5E"))
+
+                            Text(errorMessage)
+                                .font(.system(size: 12))
+                                .foregroundStyle(Color.inkMute)
+                                .lineSpacing(3)
+
+                            Button {
+                                retryFocusedFeedback(resultID: result.id)
+                            } label: {
+                                HStack(spacing: 4) {
+                                    Image(systemName: "arrow.clockwise")
+                                        .font(.system(size: 11, weight: .semibold))
+                                    Text("重试发送")
+                                        .font(.system(size: 12.5, weight: .semibold))
+                                }
+                                .foregroundStyle(Color(hex: "B34A5E"))
+                                .padding(.horizontal, 10)
+                                .frame(height: 30)
+                                .background(.white)
+                                .clipShape(Capsule())
+                                .overlay(Capsule().stroke(Color.line2, lineWidth: 1))
+                            }
+                            .buttonStyle(.plain)
+                            .disabled(isSending)
+                        }
+                        .padding(.horizontal, 12)
+                        .padding(.vertical, 10)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .background(Color.bgSoft)
+                        .clipShape(RoundedRectangle(cornerRadius: 12))
                     }
                 }
                 .padding(.horizontal, 18)
@@ -480,6 +560,15 @@ struct AnalysisResultView: View {
         let question = feedbackInput.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !question.isEmpty else { return }
         feedbackInput = ""
+        Task {
+            await appState.sendFeedback(question: question, forResultID: resultID)
+        }
+    }
+
+    private func retryFocusedFeedback(resultID: UUID) {
+        guard appState.feedbackSendingForResultID == nil else { return }
+        let lastUserMessage = (appState.feedbackThreads[resultID] ?? []).last(where: { $0.isUser })?.text.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard let question = lastUserMessage, !question.isEmpty else { return }
         Task {
             await appState.sendFeedback(question: question, forResultID: resultID)
         }

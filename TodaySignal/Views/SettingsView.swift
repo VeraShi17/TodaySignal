@@ -140,6 +140,10 @@ struct SettingsView: View {
                             .font(.system(size: 11.5, weight: .medium))
                             .foregroundStyle(Color(hex: "3F6FB8"))
 
+                        Text(cardExampleHitRateSummary)
+                            .font(.system(size: 11.5, weight: .medium))
+                            .foregroundStyle(Color(hex: "3F6FB8"))
+
                         ForEach(debugTelemetrySnapshot, id: \.counter.rawValue) { item in
                             HStack {
                                 Text(telemetryLabel(for: item.counter))
@@ -289,6 +293,14 @@ struct SettingsView: View {
             title: "回复检查",
             totalCounter: .replyCheckRequestTotal,
             fallbackCounter: .replyCheckFallbackTotal
+        )
+    }
+
+    private var cardExampleHitRateSummary: String {
+        hitRateSummary(
+            title: "卡片例句",
+            totalCounter: .cardExampleRequestTotal,
+            fallbackCounter: .cardExampleFallbackTotal
         )
     }
 

@@ -231,11 +231,11 @@ TodaySignal/
 
 | ID | Module | Implementation Functionality | Order | Status |
 |---|---|---|---:|---|
-| V1-M0.1 | Add V1 PRD | Add `Docs/PRD_V1.md` or equivalent V1 requirement document | 1 | 未开始 |
-| V1-M0.2 | Add V1 Progress Doc | Add this file as `Docs/development-progress-v1.md` | 2 | 未开始 |
-| V1-M0.3 | Add V1 Design Reference | Place `Today's Signal - V1.html` under `DesignReference/` | 3 | 未开始 |
-| V1-M0.4 | Verify Design Assets | Confirm referenced CSS/JSX files exist locally if needed | 4 | 未开始 |
-| V1-M0.5 | Review Current MVP Code | Identify existing Home, OCR, Analysis, Card files to update | 5 | 未开始 |
+| V1-M0.1 | Add V1 PRD | Add `Docs/PRD_V1.md` or equivalent V1 requirement document | 1 | 已完成 |
+| V1-M0.2 | Add V1 Progress Doc | Add this file as `Docs/development-progress-v1.md` | 2 | 已完成 |
+| V1-M0.3 | Add V1 Design Reference | Place `Today's Signal - V1.html` under `DesignReference/` | 3 | 已完成 |
+| V1-M0.4 | Verify Design Assets | Confirm referenced CSS/JSX files exist locally if needed | 4 | 已完成 |
+| V1-M0.5 | Review Current MVP Code | Identify existing Home, OCR, Analysis, Card files to update | 5 | 已完成 |
 
 Implementation notes:
 
@@ -247,12 +247,12 @@ Implementation notes:
 
 | ID | Module | Implementation Functionality | Order | Status |
 |---|---|---|---:|---|
-| V1-M1.1 | Extend LearningCard | Add AI example sentence fields to vocabulary and grammar cards | 6 | 未开始 |
-| V1-M1.2 | ReplySuggestion Model | Add model for generated reply suggestions | 7 | 未开始 |
-| V1-M1.3 | ReplyCheckResult Model | Add model for evaluating user-side replies | 8 | 未开始 |
-| V1-M1.4 | FeedbackMessage Model | Add model for Feedback Chat messages | 9 | 未开始 |
-| V1-M1.5 | Bubble Selection State | Add selected-for-reply state for idol bubbles | 10 | 未开始 |
-| V1-M1.6 | MockDataV1 | Add mock V1 reply suggestions, reply check results, feedback messages, example cards | 11 | 未开始 |
+| V1-M1.1 | Extend LearningCard | Add AI example sentence fields to vocabulary and grammar cards | 6 | 已完成 |
+| V1-M1.2 | ReplySuggestion Model | Add model for generated reply suggestions | 7 | 已完成 |
+| V1-M1.3 | ReplyCheckResult Model | Add model for evaluating user-side replies | 8 | 已完成 |
+| V1-M1.4 | FeedbackMessage Model | Add model for Feedback Chat messages | 9 | 已完成 |
+| V1-M1.5 | Bubble Selection State | Add selected-for-reply state for idol bubbles | 10 | 已完成 |
+| V1-M1.6 | MockDataV1 | Add mock V1 reply suggestions, reply check results, feedback messages, example cards | 11 | 已完成 |
 
 Suggested model examples:
 
@@ -299,11 +299,11 @@ enum ReplyCheckStatus {
 
 | ID | Module | Implementation Functionality | Order | Status |
 |---|---|---|---:|---|
-| V1-M2.1 | Home Layout Review | Review current Home layout and identify insertion point | 12 | 未开始 |
-| V1-M2.2 | Quick Reply Card | Add “快速实时回复” soft card | 13 | 未开始 |
-| V1-M2.3 | Learning vs Reply Separation | Visually separate “学习解析” and “快速回复” tasks | 14 | 未开始 |
-| V1-M2.4 | Quick Reply Navigation | Navigate from Home to ReplySuggestionView | 15 | 未开始 |
-| V1-M2.5 | Home Copy Polish | Add V1 microcopy while keeping page simple | 16 | 未开始 |
+| V1-M2.1 | Home Layout Review | Review current Home layout and identify insertion point | 12 | 已完成 |
+| V1-M2.2 | Quick Reply Card | Add “快速实时回复” soft card | 13 | 已完成 |
+| V1-M2.3 | Learning vs Reply Separation | Visually separate “学习解析” and “快速回复” tasks | 14 | 已完成 |
+| V1-M2.4 | Quick Reply Navigation | Navigate from Home to ReplySuggestionView | 15 | 已完成 |
+| V1-M2.5 | Home Copy Polish | Add V1 microcopy while keeping page simple | 16 | 已完成 |
 
 Home should contain two clear task cards:
 
@@ -323,17 +323,17 @@ Home should contain two clear task cards:
 
 | ID | Module | Implementation Functionality | Order | Status |
 |---|---|---|---:|---|
-| V1-M3.1 | Detect My-side Bubbles | Identify non-idol side as user/my side after idol side selection | 17 | 未开始 |
-| V1-M3.2 | My Reply Check Toggle | Add `同时检查我的回复` toggle | 18 | 未开始 |
-| V1-M3.3 | Toggle Display Rule | Show toggle only when my-side Korean bubbles exist | 19 | 未开始 |
-| V1-M3.4 | Default Toggle State | Default on when my-side Korean bubbles are detected | 20 | 未开始 |
-| V1-M3.5 | Selectable Idol Bubbles | Allow selecting one or more idol-side bubbles for reply suggestion | 21 | 未开始 |
-| V1-M3.6 | Selection Visual State | Add checkbox / highlight / selected border state | 22 | 未开始 |
-| V1-M3.7 | Bottom Action Bar | Add `学习解析` and `生成回复建议` buttons | 23 | 未开始 |
-| V1-M3.8 | No Selection Hint | If no bubble selected for reply, show `请先选择想回复的消息。` | 24 | 未开始 |
-| V1-M3.9 | Too-many-bubbles Warning | Show warning if OCR identifies more than 12 bubbles | 25 | 未开始 |
-| V1-M3.10 | Route to ReplySuggestion | Pass selected idol bubbles into ReplySuggestionView | 26 | 未开始 |
-| V1-M3.11 | Route to Analysis | Pass `checkMyReplyEnabled` into AnalysisResultView | 27 | 未开始 |
+| V1-M3.1 | Detect My-side Bubbles | Identify non-idol side as user/my side after idol side selection | 17 | 已完成 |
+| V1-M3.2 | My Reply Check Toggle | Add `同时检查我的回复` toggle | 18 | 已完成 |
+| V1-M3.3 | Toggle Display Rule | Show toggle only when my-side Korean bubbles exist | 19 | 已完成 |
+| V1-M3.4 | Default Toggle State | Default on when my-side Korean bubbles are detected | 20 | 已完成 |
+| V1-M3.5 | Selectable Idol Bubbles | Allow selecting one or more idol-side bubbles for reply suggestion | 21 | 已完成 |
+| V1-M3.6 | Selection Visual State | Add checkbox / highlight / selected border state | 22 | 已完成 |
+| V1-M3.7 | Bottom Action Bar | Add `学习解析` and `生成回复建议` buttons | 23 | 已完成 |
+| V1-M3.8 | No Selection Hint | If no bubble selected for reply, show `请先选择想回复的消息。` | 24 | 已完成 |
+| V1-M3.9 | Too-many-bubbles Warning | Show warning if OCR identifies more than 12 bubbles | 25 | 已完成 |
+| V1-M3.10 | Route to ReplySuggestion | Pass selected idol bubbles into ReplySuggestionView | 26 | 已完成 |
+| V1-M3.11 | Route to Analysis | Pass `checkMyReplyEnabled` into AnalysisResultView | 27 | 已完成 |
 
 Recommended bottom UI:
 
@@ -359,19 +359,19 @@ Buttons:
 
 | ID | Module | Implementation Functionality | Order | Status |
 |---|---|---|---:|---|
-| V1-M4.1 | ReplySuggestionView | Create new page for quick reply generation | 28 | 未开始 |
-| V1-M4.2 | Entry from Home | Support homepage quick reply entry | 29 | 未开始 |
-| V1-M4.3 | Entry from OCR Confirmation | Support selected idol bubbles as context | 30 | 未开始 |
-| V1-M4.4 | Context Display | Show selected idol bubbles or pasted text | 31 | 未开始 |
-| V1-M4.5 | Home Entry Input Options | Support upload screenshot or paste text state in UI | 32 | 未开始 |
-| V1-M4.6 | Chinese Intent Input | Add optional Chinese text input field | 33 | 未开始 |
-| V1-M4.7 | Reply Tone Selector | Add tone chips: 自然 / 可爱 / 礼貌 / 朋友感 / 暧昧感 | 34 | 未开始 |
-| V1-M4.8 | Default Tone | Default tone is `自然` | 35 | 未开始 |
-| V1-M4.9 | Generate Button | Add `生成 3 条回复` CTA | 36 | 未开始 |
-| V1-M4.10 | Reply Loading State | Show `正在帮你组织自然韩语回复…` | 37 | 未开始 |
-| V1-M4.11 | Reply Results List | Show 3 reply suggestion cards | 38 | 未开始 |
-| V1-M4.12 | Copy Reply | Add copy action to each generated reply | 39 | 未开始 |
-| V1-M4.13 | Empty State | Show `先选择一条想回复的消息，或输入你想说的话。` | 40 | 未开始 |
+| V1-M4.1 | ReplySuggestionView | Create new page for quick reply generation | 28 | 已完成 |
+| V1-M4.2 | Entry from Home | Support homepage quick reply entry | 29 | 已完成 |
+| V1-M4.3 | Entry from OCR Confirmation | Support selected idol bubbles as context | 30 | 已完成 |
+| V1-M4.4 | Context Display | Show selected idol bubbles or pasted text | 31 | 已完成 |
+| V1-M4.5 | Home Entry Input Options | Support upload screenshot or paste text state in UI | 32 | 已完成 |
+| V1-M4.6 | Chinese Intent Input | Add optional Chinese text input field | 33 | 已完成 |
+| V1-M4.7 | Reply Tone Selector | Add tone chips: 自然 / 可爱 / 礼貌 / 朋友感 / 暧昧感 | 34 | 已完成 |
+| V1-M4.8 | Default Tone | Default tone is `自然` | 35 | 已完成 |
+| V1-M4.9 | Generate Button | Add `生成 3 条回复` CTA | 36 | 已完成 |
+| V1-M4.10 | Reply Loading State | Show `正在帮你组织自然韩语回复…` | 37 | 已完成 |
+| V1-M4.11 | Reply Results List | Show 3 reply suggestion cards | 38 | 已完成 |
+| V1-M4.12 | Copy Reply | Add copy action to each generated reply | 39 | 已完成 |
+| V1-M4.13 | Empty State | Show `先选择一条想回复的消息，或输入你想说的话。` | 40 | 已完成 |
 
 Reply Suggestion input fields:
 
@@ -402,17 +402,17 @@ Result card fields:
 | ID | Module | Implementation Functionality | Order | Status |
 |---|---|---|---:|---|
 | V1-M5.1 | Analysis Layout Review | Review existing AnalysisResultView | 41 | 未开始 |
-| V1-M5.2 | My Reply Check Section | Add section below or between analysis sections | 42 | 未开始 |
-| V1-M5.3 | Reply Check Natural State | Show natural feedback card | 43 | 未开始 |
-| V1-M5.4 | Reply Check Improvement State | Show issue explanation and suggested alternative | 44 | 未开始 |
-| V1-M5.5 | Copy Suggested Alternative | Add copy button for improved reply | 45 | 未开始 |
-| V1-M5.6 | Conditional Display | Show section only when check is enabled and my-side replies exist | 46 | 未开始 |
-| V1-M5.7 | Feedback Chat Section | Add bottom unified follow-up input | 47 | 未开始 |
-| V1-M5.8 | Feedback Input Bar | Add text field and send button | 48 | 未开始 |
-| V1-M5.9 | Feedback Quick Chips | Add optional quick chips | 49 | 未开始 |
-| V1-M5.10 | Feedback Loading State | Show `正在继续解释这个表达…` | 50 | 未开始 |
-| V1-M5.11 | Feedback Response Card | Show AI response below input or in thread-like card | 51 | 未开始 |
-| V1-M5.12 | Analysis Context Passing | Pass current analysis context to FeedbackChatViewModel | 52 | 未开始 |
+| V1-M5.2 | My Reply Check Section | Add section below or between analysis sections | 42 | 已完成 |
+| V1-M5.3 | Reply Check Natural State | Show natural feedback card | 43 | 已完成 |
+| V1-M5.4 | Reply Check Improvement State | Show issue explanation and suggested alternative | 44 | 已完成 |
+| V1-M5.5 | Copy Suggested Alternative | Add copy button for improved reply | 45 | 已完成 |
+| V1-M5.6 | Conditional Display | Show section only when check is enabled and my-side replies exist | 46 | 已完成 |
+| V1-M5.7 | Feedback Chat Section | Add bottom unified follow-up input | 47 | 已完成 |
+| V1-M5.8 | Feedback Input Bar | Add text field and send button | 48 | 已完成 |
+| V1-M5.9 | Feedback Quick Chips | Add optional quick chips | 49 | 已完成 |
+| V1-M5.10 | Feedback Loading State | Show `正在继续解释这个表达…` | 50 | 已完成 |
+| V1-M5.11 | Feedback Response Card | Show AI response below input or in thread-like card | 51 | 已完成 |
+| V1-M5.12 | Analysis Context Passing | Pass current analysis context to FeedbackChatViewModel | 52 | 已完成 |
 
 Recommended Analysis Result sections:
 
@@ -442,14 +442,14 @@ Use gentle wording:
 
 | ID | Module | Implementation Functionality | Order | Status |
 |---|---|---|---:|---|
-| V1-M6.1 | Vocabulary Card Data Update | Add example sentence and translation fields | 53 | 未开始 |
-| V1-M6.2 | Grammar Card Data Update | Add 1–2 example sentences and translations | 54 | 未开始 |
-| V1-M6.3 | Card Preview Modal Update | Show AI examples in preview | 55 | 未开始 |
-| V1-M6.4 | Vocabulary Card Detail Update | Show example in card library detail | 56 | 未开始 |
-| V1-M6.5 | Grammar Card Detail Update | Show examples in card library detail | 57 | 未开始 |
-| V1-M6.6 | Mock Example Data | Add realistic Korean examples to mock cards | 58 | 未开始 |
-| V1-M6.7 | Card Generation Integration | Ensure new cards include examples when generated | 59 | 未开始 |
-| V1-M6.8 | Example Missing Fallback | If example generation fails, show graceful placeholder or retry | 60 | 未开始 |
+| V1-M6.1 | Vocabulary Card Data Update | Add example sentence and translation fields | 53 | 已完成 |
+| V1-M6.2 | Grammar Card Data Update | Add 1–2 example sentences and translations | 54 | 已完成 |
+| V1-M6.3 | Card Preview Modal Update | Show AI examples in preview | 55 | 已完成 |
+| V1-M6.4 | Vocabulary Card Detail Update | Show example in card library detail | 56 | 已完成 |
+| V1-M6.5 | Grammar Card Detail Update | Show examples in card library detail | 57 | 已完成 |
+| V1-M6.6 | Mock Example Data | Add realistic Korean examples to mock cards | 58 | 已完成 |
+| V1-M6.7 | Card Generation Integration | Ensure new cards include examples when generated | 59 | 已完成 |
+| V1-M6.8 | Example Missing Fallback | If example generation fails, show graceful placeholder or retry | 60 | 已完成 |
 
 Vocabulary card example fields:
 
@@ -466,16 +466,16 @@ Grammar card example fields:
 
 | ID | Module | Implementation Functionality | Order | Status |
 |---|---|---|---:|---|
-| V1-M7.1 | Service Interface Review | Review existing AIAnalysisService | 61 | 未开始 |
-| V1-M7.2 | ReplySuggestionService | Add service for generating reply suggestions | 62 | 未开始 |
-| V1-M7.3 | ReplyCheckService | Add service for evaluating user replies | 63 | 未开始 |
-| V1-M7.4 | FeedbackChatService | Add service for follow-up questions | 64 | 未开始 |
-| V1-M7.5 | CardExampleService | Add service or extend card generation to include examples | 65 | 未开始 |
-| V1-M7.6 | Mock Service Mode | Support mock responses for development and testing | 66 | 未开始 |
-| V1-M7.7 | Real API Integration | Connect V1 service calls to selected LLM API | 67 | 未开始 |
-| V1-M7.8 | JSON Schema Validation | Validate AI outputs before rendering | 68 | 未开始 |
-| V1-M7.9 | Timeout Handling | Add timeout handling for V1 AI calls | 69 | 未开始 |
-| V1-M7.10 | Partial Failure Handling | Let individual V1 calls fail gracefully | 70 | 未开始 |
+| V1-M7.1 | Service Interface Review | Review existing AIAnalysisService | 61 | 已完成 |
+| V1-M7.2 | ReplySuggestionService | Add service for generating reply suggestions | 62 | 已完成 |
+| V1-M7.3 | ReplyCheckService | Add service for evaluating user replies | 63 | 已完成 |
+| V1-M7.4 | FeedbackChatService | Add service for follow-up questions | 64 | 已完成 |
+| V1-M7.5 | CardExampleService | Add service or extend card generation to include examples | 65 | 已完成 |
+| V1-M7.6 | Mock Service Mode | Support mock responses for development and testing | 66 | 已完成 |
+| V1-M7.7 | Real API Integration | Connect V1 service calls to selected LLM API | 67 | 已完成 |
+| V1-M7.8 | JSON Schema Validation | Validate AI outputs before rendering | 68 | 已完成 |
+| V1-M7.9 | Timeout Handling | Add timeout handling for V1 AI calls | 69 | 已完成 |
+| V1-M7.10 | Partial Failure Handling | Let individual V1 calls fail gracefully | 70 | 已完成 |
 
 Recommended services:
 
@@ -510,14 +510,14 @@ Performance goals:
 
 | ID | Module | Implementation Functionality | Order | Status |
 |---|---|---|---:|---|
-| V1-M8.1 | Reply Suggestion Prompt | Generate 3 natural Korean replies | 71 | 未开始 |
-| V1-M8.2 | Reply Suggestion Schema | Define JSON schema for reply suggestions | 72 | 未开始 |
-| V1-M8.3 | Reply Check Prompt | Evaluate user replies gently | 73 | 未开始 |
-| V1-M8.4 | Reply Check Schema | Define JSON schema for reply check results | 74 | 未开始 |
-| V1-M8.5 | Feedback Chat Prompt | Answer follow-up questions with analysis context | 75 | 未开始 |
-| V1-M8.6 | Feedback Chat Schema | Define response format for follow-up answers | 76 | 未开始 |
-| V1-M8.7 | Card Example Prompt | Generate Korean examples for card content | 77 | 未开始 |
-| V1-M8.8 | Safety Rules | Add boundaries for idol/fan reply suggestions | 78 | 未开始 |
+| V1-M8.1 | Reply Suggestion Prompt | Generate 3 natural Korean replies | 71 | 已完成 |
+| V1-M8.2 | Reply Suggestion Schema | Define JSON schema for reply suggestions | 72 | 已完成 |
+| V1-M8.3 | Reply Check Prompt | Evaluate user replies gently | 73 | 已完成 |
+| V1-M8.4 | Reply Check Schema | Define JSON schema for reply check results | 74 | 已完成 |
+| V1-M8.5 | Feedback Chat Prompt | Answer follow-up questions with analysis context | 75 | 已完成 |
+| V1-M8.6 | Feedback Chat Schema | Define response format for follow-up answers | 76 | 已完成 |
+| V1-M8.7 | Card Example Prompt | Generate Korean examples for card content | 77 | 已完成 |
+| V1-M8.8 | Safety Rules | Add boundaries for idol/fan reply suggestions | 78 | 已完成 |
 
 Safety rules for reply generation:
 
@@ -532,12 +532,18 @@ Safety rules for reply generation:
 
 | ID | Module | Implementation Functionality | Order | Status |
 |---|---|---|---:|---|
-| V1-M9.1 | Storage Model Migration | Add example fields to saved cards | 79 | 未开始 |
-| V1-M9.2 | Backward Compatibility | Existing MVP cards without examples should still load | 80 | 未开始 |
-| V1-M9.3 | Save New Card Examples | Save generated examples with new cards | 81 | 未开始 |
-| V1-M9.4 | Do Not Save Quick Replies | Reply suggestions should not be saved by default | 82 | 未开始 |
-| V1-M9.5 | Do Not Save Feedback History | Feedback chat history not persisted in V1 | 83 | 未开始 |
-| V1-M9.6 | Do Not Save Screenshots | Continue not saving original screenshots | 84 | 未开始 |
+| V1-M9.1 | Storage Model Migration | Add example fields to saved cards | 79 | 已完成 |
+| V1-M9.2 | Backward Compatibility | Existing MVP cards without examples should still load | 80 | 已完成 |
+| V1-M9.3 | Save New Card Examples | Save generated examples with new cards | 81 | 已完成 |
+| V1-M9.4 | Do Not Save Quick Replies | Reply suggestions should not be saved by default | 82 | 已完成 |
+| V1-M9.5 | Do Not Save Feedback History | Feedback chat history not persisted in V1 | 83 | 已完成 |
+| V1-M9.6 | Do Not Save Screenshots | Continue not saving original screenshots | 84 | 已完成 |
+
+> 已通过 `CardStorageService.swift` 与 `AppState.swift` 落地：
+> - `PersistedVocabularyCard` 含 `exampleSentence` + `exampleTranslationZH`
+> - `PersistedGrammarCard` 用 `exampleSentencesData` 存多条例句
+> - `PersistedKnowledgeMark` 记录 known/dismissed
+> - 旧卡片默认值填空兼容；ReplySuggestion / FeedbackMessage / 截图均不入库
 
 Persistence rules:
 
@@ -559,14 +565,14 @@ Do not save by default:
 
 | ID | Module | Implementation Functionality | Order | Status |
 |---|---|---|---:|---|
-| V1-M10.1 | Reply Loading | `正在帮你组织自然韩语回复…` | 85 | 未开始 |
-| V1-M10.2 | Feedback Loading | `正在继续解释这个表达…` | 86 | 未开始 |
-| V1-M10.3 | Reply Empty State | `先选择一条想回复的消息，或输入你想说的话。` | 87 | 未开始 |
-| V1-M10.4 | Too-many-bubbles Warning | Show warning for >12 bubbles | 88 | 未开始 |
-| V1-M10.5 | Reply Generation Error | Show retry for failed quick replies | 89 | 未开始 |
-| V1-M10.6 | Feedback Error | Show retry for failed follow-up answer | 90 | 未开始 |
-| V1-M10.7 | Reply Check Partial Failure | Show available reply checks, retry failed ones | 91 | 未开始 |
-| V1-M10.8 | Card Example Failure | Allow card to save without example or retry example generation | 92 | 未开始 |
+| V1-M10.1 | Reply Loading | `正在帮你组织自然韩语回复…` | 85 | 已完成 |
+| V1-M10.2 | Feedback Loading | `正在继续解释这个表达…` | 86 | 已完成 |
+| V1-M10.3 | Reply Empty State | `先选择一条想回复的消息，或输入你想说的话。` | 87 | 已完成 |
+| V1-M10.4 | Too-many-bubbles Warning | Show warning for >12 bubbles | 88 | 已完成 |
+| V1-M10.5 | Reply Generation Error | Show retry for failed quick replies | 89 | 已完成 |
+| V1-M10.6 | Feedback Error | Show retry for failed follow-up answer | 90 | 已完成 |
+| V1-M10.7 | Reply Check Partial Failure | Show available reply checks, retry failed ones | 91 | 已完成 |
+| V1-M10.8 | Card Example Failure | Allow card to save without example or retry example generation | 92 | 已完成 |
 
 ### 5.12 QA and Polish
 
@@ -591,47 +597,47 @@ Do not save by default:
 
 | Order | Task | Status |
 |---:|---|---|
-| 1 | Add V1 docs and design reference | 未开始 |
-| 2 | Extend data models for reply suggestions, reply checks, feedback messages, card examples | 未开始 |
-| 3 | Add V1 mock data | 未开始 |
-| 4 | Update Home with Quick Reply card | 未开始 |
-| 5 | Update OCR confirmation page with toggle, bubble selection, and reply button | 未开始 |
-| 6 | Add ReplySuggestionView with mock results | 未开始 |
-| 7 | Update AnalysisResultView with my reply check and feedback chat UI | 未开始 |
-| 8 | Update card preview and card details with AI examples | 未开始 |
+| 1 | Add V1 docs and design reference | 已完成 |
+| 2 | Extend data models for reply suggestions, reply checks, feedback messages, card examples | 已完成 |
+| 3 | Add V1 mock data | 已完成 |
+| 4 | Update Home with Quick Reply card | 已完成 |
+| 5 | Update OCR confirmation page with toggle, bubble selection, and reply button | 已完成 |
+| 6 | Add ReplySuggestionView with mock results | 已完成 |
+| 7 | Update AnalysisResultView with my reply check and feedback chat UI | 已完成 |
+| 8 | Update card preview and card details with AI examples | 已完成 |
 
 ### Phase V1-B — Local Interaction
 
 | Order | Task | Status |
 |---:|---|---|
-| 9 | Make idol bubbles selectable for reply suggestion | 未开始 |
-| 10 | Pass selected bubbles to ReplySuggestionView | 未开始 |
-| 11 | Implement tone selector state | 未开始 |
-| 12 | Implement Chinese intent input state | 未开始 |
-| 13 | Generate mock 3 replies | 未开始 |
-| 14 | Add copy actions | 未开始 |
-| 15 | Toggle my reply check on/off | 未开始 |
-| 16 | Add mock feedback chat response interaction | 未开始 |
+| 9 | Make idol bubbles selectable for reply suggestion | 已完成 |
+| 10 | Pass selected bubbles to ReplySuggestionView | 已完成 |
+| 11 | Implement tone selector state | 已完成 |
+| 12 | Implement Chinese intent input state | 已完成 |
+| 13 | Generate mock 3 replies | 已完成 |
+| 14 | Add copy actions | 已完成 |
+| 15 | Toggle my reply check on/off | 已完成 |
+| 16 | Add mock feedback chat response interaction | 已完成 |
 
 ### Phase V1-C — AI Service Integration
 
 | Order | Task | Status |
 |---:|---|---|
 | 17 | Implement ReplySuggestionService | 已完成 |
-| 18 | Implement ReplyCheckService | 未开始 |
-| 19 | Implement FeedbackChatService | 未开始 |
-| 20 | Implement card example generation | 未开始 |
-| 21 | Add JSON schema validation | 未开始 |
-| 22 | Add timeout and retry handling | 未开始 |
+| 18 | Implement ReplyCheckService | 已完成 |
+| 19 | Implement FeedbackChatService | 已完成 |
+| 20 | Implement card example generation | 已完成 |
+| 21 | Add JSON schema validation | 已完成 |
+| 22 | Add timeout and retry handling | 已完成 |
 
 ### Phase V1-D — Persistence and Compatibility
 
 | Order | Task | Status |
 |---:|---|---|
-| 23 | Migrate card storage schema for examples | 未开始 |
-| 24 | Support old cards without examples | 未开始 |
-| 25 | Save examples with new cards | 未开始 |
-| 26 | Confirm quick replies and feedback history are not persisted | 未开始 |
+| 23 | Migrate card storage schema for examples | 已完成 |
+| 24 | Support old cards without examples | 已完成 |
+| 25 | Save examples with new cards | 已完成 |
+| 26 | Confirm quick replies and feedback history are not persisted | 已完成 |
 
 ### Phase V1-E — QA and Polish
 
@@ -643,7 +649,7 @@ Do not save by default:
 | 30 | Test OCR → learning analysis + reply check path | 未开始 |
 | 31 | Test feedback chat | 未开始 |
 | 32 | Test privacy requirements | 未开始 |
-| 33 | Update progress document | 未开始 |
+| 33 | Update progress document | 进行中 |
 
 ---
 
@@ -715,27 +721,30 @@ Analysis Result
 | MVP core functionality | Screenshot OCR, speaker separation, idol-side analysis, learning cards |
 | V1 PRD direction | Feedback chat, reply suggestion, my reply check, card examples |
 | V1 design prototype | Uploaded as `Today's Signal - V1.html` |
+| V1 Data Models & Mock | ReplySuggestion / ReplyCheckResult / FeedbackMessage / 卡片例句字段 全部接入 `AppState` |
+| Home Quick Reply Entry | `HomeView` 已含双任务卡片（学习解析 + 快速实时回复） |
+| OCR Confirmation V1 改造 | Toggle / Reply mode / 可选 idol 气泡 / 双 CTA / 12 条警告 全部落地 |
+| ReplySuggestionView | context / intent / tone / 生成 3 条 / 复制 / 错误重试 完整流程 |
+| AnalysisResultView V1 | 我的回复检查 + Feedback Chat 已完成 |
+| Card Example 生成 | Vocab + Grammar 例句服务 + Preview Modal 加载/重试 |
+| V1 服务层 | ReplySuggestion / ReplyCheck / FeedbackChat / CardExample 全部接入 |
+| V1 持久化迁移 | SwiftData schema 已含例句字段，向后兼容旧卡片，不存截图/回复/追问历史 |
 
 ### 8.2 In Progress
 
 | Item | Notes |
 |---|---|
-| V1 development planning | This document defines module breakdown and implementation order |
+| V1 QA and polish | 进入收尾阶段：视觉对齐 V1 设计稿、Flow 端到端测试、性能与隐私 QA |
 
 ### 8.3 Not Started
 
 | Item |
 |---|
-| V1 model updates |
-| V1 Home quick reply entry |
-| OCR confirmation selection/toggle update |
-| Reply Suggestion page |
-| My Reply Check section |
-| Feedback Chat |
-| Card example generation |
-| V1 AI service integration |
-| V1 persistence migration |
-| V1 QA and polish |
+| V1-M11 视觉 Polish（对照 `Today's Signal - V1.html` 微调间距/色值） |
+| V1-M11 端到端 Flow QA（Home → Reply / OCR → Reply / OCR → Analysis + ReplyCheck / Feedback Chat） |
+| V1-M11 性能测量（Reply 10–20s / Feedback 10–20s / Analysis 30s） |
+| V1-M11 隐私 QA（确认截图与追问历史不入库） |
+| V1 Demo 脚本与示例数据 |
 
 ---
 
@@ -760,6 +769,37 @@ Analysis Result
 #### Next Recommended Task
 
 Begin **Phase V1-A: Docs, Models, and Mock UI**.
+
+### 2026-05-18
+
+#### Status Reconciliation
+
+- 对照实际代码全面核对 V1 模块状态，发现文档严重滞后。
+- 已将以下模块状态从 `未开始` 同步为 `已完成`：
+  - V1-M1.x 数据模型与 Mock 数据
+  - V1-M2.x Home Quick Reply 入口
+  - V1-M3.x OCR Confirmation V1 改造（含 12 条警告 / Toggle / Reply Mode / 双 CTA）
+  - V1-M4.x ReplySuggestion 完整流程
+  - V1-M9.x 持久化迁移（SwiftData schema + 向后兼容）
+  - V1-M10.4 Too-many-bubbles 警告
+  - Phase V1-A / V1-B / V1-D 全部
+- Section 8 现状表已同步至当前真实状态。
+
+#### Current Task
+
+- V1 功能层 Definition-of-Done 基本达成，剩下 Phase V1-E 收尾：
+  - 视觉 polish 与设计稿对齐
+  - 端到端 Flow QA
+  - 性能 / 隐私 QA
+  - Demo 脚本
+
+#### Next Recommended Task
+
+进入 **Phase V1-E: QA and Polish**，建议优先级：
+1. 端到端 Flow QA（Home → Reply / OCR → Reply / OCR → Analysis + Reply Check / Feedback Chat 四条主路径在 Simulator 实跑）
+2. 视觉对齐 `Today's Signal - V1.html`
+3. 性能测量与超时验证
+4. 隐私 QA
 
 ---
 
@@ -859,6 +899,80 @@ After implementation, update Docs/development-progress-v1.md with completed task
   - generic fallback hit rate (`feedback.too_generic`)
   - over-correction rate in `ReplyCheck`
   - user comprehension for grammar-focused quick prompts
+
+### 12.5 Error Retry UX Update
+
+- `ReplySuggestionView` now shows a unified error card with:
+  - concise title (`生成失败，可重试`)
+  - detailed error text
+  - retry CTA (`重试生成`)
+- `AnalysisResultView` focused feedback sheet now shows:
+  - concise title (`追问失败，可重试`)
+  - detailed error text
+  - retry CTA (`重试发送`)
+- Feedback retry reuses the latest user question in the current focused thread, reducing repeated typing during unstable network/API periods.
+
+### 12.6 ReplyCheck Partial Failure + Per-item Retry
+
+- `ReplyCheck` no longer disappears entirely when a request fails.
+- On failure, each my-side bubble now gets a visible failure card so users can still see which line failed.
+- Added per-item retry button (`重试这条`) with inline loading state (`重试中…`).
+- Retry now runs on a single bubble only, preserving other successful reply-check results.
+
+### 12.7 Card Example Retry in Preview Modal
+
+- `CardPreviewModal` now provides `重试生成例句` action after initial save.
+- Retry state and error copy are shown inline in the modal (`正在重试例句…`, `例句重试失败，请稍后再试。`).
+- Retry result updates both:
+  - preview card content;
+  - corresponding stored card in library (same card `id`, persisted via storage service).
+
+### 12.8 Test Infrastructure Fix (2026-05-18)
+
+**问题：** 新建的 `TodaySignalTests` 单元测试 target 通过 CLI / `RunSomeTests` 跑时全部失败，链接器报大量 `Undefined symbol: TodaySignal.ChatBubble.init...`、`AppState.__allocating_init...` 等错误。即使是已存在的 6 个 `ServiceContractsTests` 测试也无法运行。
+
+**根因：** `TodaySignal.xcodeproj/project.pbxproj` 里 `TodaySignalTests` target 的两个 build configuration 都缺少 `BUNDLE_LOADER` 设置。
+
+- iOS 单元测试 target 必须同时配置：
+  - `TEST_HOST` — 运行时加载的 host app 二进制路径（已有）
+  - `BUNDLE_LOADER = $(TEST_HOST)` — 链接时去 host app 二进制里解析未定义符号（缺失）
+- 仅有 `TEST_HOST` 而无 `BUNDLE_LOADER` 时，测试 target 链接时找不到主 module 的 internal 符号，导致 `@testable import TodaySignal` 后所有引用都变成 undefined symbol。
+
+**附带脏数据：** Release 配置里有一行非法 build setting `.2 = .2;`，疑似手动编辑时误输入，需要清理。
+
+**修复步骤：** 由用户在 Xcode IDE 中手动完成（直接编辑 `project.pbxproj` 会导致 Xcode 崩溃，不可用工具自动改）：
+
+1. 在 Xcode 中打开项目 → 选中 `TodaySignal` project → 选 `TodaySignalTests` target → **Build Settings** 标签。
+2. 在搜索框输入 `bundle loader`，找到 `Bundle Loader` 行，给 Debug 和 Release 两栏都填入 `$(TEST_HOST)`。
+3. 在搜索框输入 `.2`，定位 Release 配置中名为 `.2` 的非法 user-defined setting，右键删除。
+4. 保存（⌘S）后，pbxproj 中两个 config 都会新增 `BUNDLE_LOADER = "$(TEST_HOST)";`，且 `.2 = .2;` 行被移除。
+
+**验证：** 修复后 17 个测试（既有 6 个 + 新增 11 个 `AppStateV1FlowTests`）通过 `mcp__xcode-tools__RunSomeTests` 一次性全绿。
+
+**经验沉淀：**
+
+- 今后用 Xcode 26+ 创建 iOS 单元测试 target 时，需要立刻在 Build Settings 里检查 `BUNDLE_LOADER` 是否被正确设成 `$(TEST_HOST)`。Xcode 模板有时只设了 `TEST_HOST`，会导致 IDE 内 ⌘U 能跑（IDE 走另一条 path）但 CLI / 自动化 / xcodebuild 跑不通。
+- AI 助手不应直接编辑 `project.pbxproj`；当 Xcode 打开时直接改这个文件会几乎必然导致 Xcode 崩溃或项目损坏。所有 build setting / target 结构改动都必须通过 Xcode UI 完成。
+
+### 12.9 V1 状态机契约测试覆盖
+
+新增 `AppStateV1FlowTests`（11 个）覆盖 V1 三大主流程状态机，目的是防止后续重构静默破坏 V1 行为：
+
+| 主题 | 测试 | 验证点 |
+|---|---|---|
+| ReplySuggestion | `prepareReplyContextEmptyReturnsFalse` | 空选拒绝并保持 `replyContextBubbles` 空 |
+| ReplySuggestion | `prepareReplyContextWithSelectionResetsState` | 有选时返回 `true`，重置 intent / tone / suggestions |
+| ReplySuggestion | `prepareReplyContextFromHomeClearsState` | Home 入口完全清空所有 reply 相关状态 |
+| ReplySuggestion | `generateReplySuggestionsSuccess` | 成功填充 3 条并清空旧 error |
+| ReplySuggestion | `generateReplySuggestionsFailure` | 失败时清空建议并曝出 error message |
+| FeedbackChat | `feedbackEmptyQuestionIsNoOp` | 空 question 不改 thread / error / inflight 状态 |
+| FeedbackChat | `feedbackUnknownResultIDIsNoOp` | 未知 resultID 不污染任何 thread |
+| FeedbackChat | `feedbackSuccessAppendsBothMessages` | 顺序追加 user question 与 AI reply |
+| FeedbackChat | `feedbackFailureSetsError` | 失败保留 user 消息并填 `feedbackErrors[resultID]` |
+| Bubble Selection | `toggleReplyBubbleSelectionAddsAndRemoves` | toggle 增/删幂等切换 |
+| Bubble Selection | `hasMySideBubblesReflectsIdolSide` | 跟随 `idolSide` 翻转 |
+
+依赖于 12.8 节修复后的测试基础设施。
 
 ---
 

@@ -209,8 +209,19 @@ struct ReplyCheckResult: Identifiable {
     let issueZh: String?
     let suggestedReplyKo: String?
     let suggestedReplyZh: String?
+    let failureMessage: String?
 
-    init(id: UUID = UUID(), bubbleID: UUID?, originalReply: String, status: ReplyCheckStatus, feedbackZh: String, issueZh: String?, suggestedReplyKo: String?, suggestedReplyZh: String?) {
+    init(
+        id: UUID = UUID(),
+        bubbleID: UUID?,
+        originalReply: String,
+        status: ReplyCheckStatus,
+        feedbackZh: String,
+        issueZh: String?,
+        suggestedReplyKo: String?,
+        suggestedReplyZh: String?,
+        failureMessage: String? = nil
+    ) {
         self.id = id
         self.bubbleID = bubbleID
         self.originalReply = originalReply
@@ -219,6 +230,7 @@ struct ReplyCheckResult: Identifiable {
         self.issueZh = issueZh
         self.suggestedReplyKo = suggestedReplyKo
         self.suggestedReplyZh = suggestedReplyZh
+        self.failureMessage = failureMessage
     }
 }
 
