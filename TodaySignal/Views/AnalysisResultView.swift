@@ -4,6 +4,7 @@ struct AnalysisResultView: View {
     @Environment(AppState.self) private var appState
     @State private var feedbackInput: String = ""
     @State private var focusedResultID: UUID?
+    @State private var showExitConfirmation = false
     var onDone: () -> Void
 
     var body: some View {
@@ -126,12 +127,31 @@ struct AnalysisResultView: View {
         }
         .navigationTitle("解析结果")
         .navigationBarTitleDisplayMode(.inline)
+        .navigationBarBackButtonHidden(true)
         .toolbar {
+            ToolbarItem(placement: .topBarLeading) {
+                Button(action: { showExitConfirmation = true }) {
+                    HStack(spacing: 4) {
+                        Image(systemName: "chevron.backward")
+                            .font(.system(size: 16, weight: .semibold))
+                        Text("返回")
+                    }
+                    .foregroundStyle(Color.pink)
+                }
+            }
             ToolbarItem(placement: .topBarTrailing) {
                 Button("完成") { onDone() }
                     .font(.system(size: 14))
                     .foregroundStyle(Color.pink)
             }
+        }
+        .alert("退出当前页面？", isPresented: $showExitConfirmation) {
+            Button("留在这里", role: .cancel) {}
+            Button("退出", role: .destructive) {
+                appState.navigationPath = NavigationPath()
+            }
+        } message: {
+            Text("当前分析结果不会被保存，已保存到卡片库的内容不受影响。")
         }
         .sheet(isPresented: $appState.showCardPreview) {
             CardPreviewModal(

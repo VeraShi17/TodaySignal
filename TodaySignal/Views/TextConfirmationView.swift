@@ -20,6 +20,7 @@ struct TextConfirmationView: View {
     @State private var newBubbleSide: BubbleSide = .left
 
     @State private var showBubbleLimitAlert = false
+    @State private var showExitConfirmation = false
 
     private let bubbleLimit = 12
 
@@ -56,14 +57,29 @@ struct TextConfirmationView: View {
         }
         .navigationTitle(mode == .reply ? "选择要回复的消息" : "确认聊天内容")
         .navigationBarTitleDisplayMode(.inline)
-        .navigationBarBackButtonHidden(mode == .reply)
+        .navigationBarBackButtonHidden(true)
         .toolbar {
-            if mode == .reply {
-                ToolbarItem(placement: .topBarLeading) {
+            ToolbarItem(placement: .topBarLeading) {
+                if mode == .reply {
                     Button("取消") { exitReplyMode() }
                         .foregroundStyle(Color(hex: "7860B3"))
+                } else {
+                    Button(action: { showExitConfirmation = true }) {
+                        HStack(spacing: 4) {
+                            Image(systemName: "chevron.backward")
+                                .font(.system(size: 16, weight: .semibold))
+                            Text("返回")
+                        }
+                        .foregroundStyle(Color.pink)
+                    }
                 }
             }
+        }
+        .alert("退出当前页面？", isPresented: $showExitConfirmation) {
+            Button("继续编辑", role: .cancel) {}
+            Button("退出", role: .destructive) { onBack() }
+        } message: {
+            Text("当前 OCR 内容不会被保存，退出后需要重新上传截图。")
         }
         .sheet(isPresented: Binding(
             get: { editingBubbleId != nil },

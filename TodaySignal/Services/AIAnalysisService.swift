@@ -85,17 +85,19 @@ struct OpenAIAnalysisService: AIAnalysisServicing {
         let startedAt = Date()
         logger.info("AI analysis started. model=\(self.model, privacy: .public), bubbles=\(request.bubbles.count)")
 
-        let idolBubbles = request.bubbles.enumerated().filter {
-            !$0.element.text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty &&
-            $0.element.side == request.idolSide &&
-            $0.element.type == .text
+        let idolBubbles = request.bubbles.filter {
+            !$0.text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty &&
+            $0.side == request.idolSide &&
+            $0.type == .text
         }
 
         guard !idolBubbles.isEmpty else {
             throw AIAnalysisError.emptyInput
         }
 
-        let userLines = idolBubbles.map { "[\($0.offset)] \($0.element.text)" }.joined(separator: "\n")
+        let userLines = idolBubbles.enumerated()
+            .map { "[\($0.offset)] \($0.element.text)" }
+            .joined(separator: "\n")
 
         let payload: [String: Any] = [
             "model": model,
@@ -106,7 +108,7 @@ struct OpenAIAnalysisService: AIAnalysisServicing {
                 ],
                 [
                     "role": "user",
-                    "content": "请分析以下韩语聊天句子（均来自对方气泡）:\n\n\(userLines)"
+                    "content": "请分析以下韩语聊天句子（均来自对方气泡）。每条句子前的 [N] 是该句的 bubble_index，请在对应 item 的 bubble_index 字段里原样回填：\n\n\(userLines)"
                 ]
             ],
             "response_format": [
@@ -156,13 +158,14 @@ struct OpenAIAnalysisService: AIAnalysisServicing {
             let parsed = try JSONDecoder().decode(OpenAIAnalysisEnvelope.self, from: outputData)
 
             let elapsed = Date().timeIntervalSince(startedAt)
+            let returnedIndexes = parsed.items.map { $0.bubbleIndex }
             logger.info("AI analysis succeeded. items=\(parsed.items.count), elapsed=\(elapsed, format: .fixed(precision: 3))s")
-            print("[AIAnalysis] model=\(model) items=\(parsed.items.count) elapsed=\(String(format: "%.3f", elapsed))s")
+            print("[AIAnalysis] model=\(model) idol=\(idolBubbles.count) items=\(parsed.items.count) returnedIndexes=\(returnedIndexes) elapsed=\(String(format: "%.3f", elapsed))s")
 
             return parsed.items
-                .filter { $0.bubbleIndex >= 0 && $0.bubbleIndex < request.bubbles.count }
+                .filter { $0.bubbleIndex >= 0 && $0.bubbleIndex < idolBubbles.count }
                 .map { item in
-                    let sourceBubble = request.bubbles[item.bubbleIndex]
+                    let sourceBubble = idolBubbles[item.bubbleIndex]
 
                     let vocabPoints = item.vocabulary
                         .filter { !shouldDropVocabularyAsGrammarLike($0.word) }
@@ -322,6 +325,12 @@ struct OpenAIAnalysisService: AIAnalysisServicing {
     private var systemPrompt: String {
         """
         你是面向中文母语者的韩语聊天学习助手。只分析韩语原句，输出中文解释。
+
+        输入与输出对应规则（极重要，违反会导致整次解析作废）：
+        - user message 中每条句子前都带形如 [N] 的索引（N 从 0 开始连续递增）。
+        - 你必须在 items[*].bubble_index 中严格回填该句子前的 N。不要自创、不要偏移、不要重新编号、不要使用 1-based。
+        - items 数量必须等于 user message 中实际给出的句子数；不要漏掉任何一条。
+        - 同一条句子只能产生 1 个 item，不要拆分或合并句子。
 
         核心目标：
         1. vocabulary.word 必须优先输出词典形/原型，不要输出表面活用形。
