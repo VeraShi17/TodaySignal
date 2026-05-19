@@ -180,10 +180,12 @@ struct OpenAIAnalysisService: AIAnalysisServicing {
                             )
                         }
 
-                    let grammarPoints = item.grammarPoints.map {
+                    let grammarPoints = item.grammarPoints
+                        .filter { !shouldDropGrammarPoint($0) }
+                        .map {
                         KnowledgePoint(
                             type: .grammar,
-                            term: $0.point,
+                            term: $0.point.trimmingCharacters(in: .whitespacesAndNewlines),
                             meaningZH: normalizeGrammarMeaning(point: $0.point, meaning: $0.meaningZH),
                             toneNote: $0.toneNote,
                             usageNote: buildGrammarUsageContext(surfaceForm: $0.surfaceForm, usageContext: $0.usageContext, category: $0.category)
@@ -275,6 +277,39 @@ struct OpenAIAnalysisService: AIAnalysisServicing {
         return grammarLikeVocabulary.contains(normalized)
     }
 
+    private func shouldDropGrammarPoint(_ item: OpenAIGrammarItem) -> Bool {
+        let point = item.point.trimmingCharacters(in: .whitespacesAndNewlines)
+        let surface = item.surfaceForm?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+
+        if point.isEmpty { return true }
+
+        let bannedCategoryNames: Set<String> = [
+            "语气助词", "疑问词", "动词", "形容词", "名词", "副词",
+            "助词", "词尾", "语法", "口语表达", "语气表达"
+        ]
+        if bannedCategoryNames.contains(point) { return true }
+
+        let lowValuePatterns = [
+            #"^~+$"#,
+            #"^\.+$"#,
+            #"^!+$"#,
+            #"^\?+$"#,
+            #"^[ㅋㅎㅠㅜ]+$"#,
+            #"^[~.!?ㅋㅎㅠㅜ]+$"#
+        ]
+
+        for pattern in lowValuePatterns {
+            if point.range(of: pattern, options: .regularExpression) != nil { return true }
+            if surface.range(of: pattern, options: .regularExpression) != nil { return true }
+        }
+
+        let hasHangul = point.range(of: #"[가-힣ㄱ-ㅎㅏ-ㅣ]"#, options: .regularExpression) != nil
+        let looksLikeGrammarNotation = point.contains("-") || point.contains("(") || point.contains("/")
+        if !hasHangul && !looksLikeGrammarNotation { return true }
+
+        return false
+    }
+
     private func deduplicatedKnowledgePoints(_ points: [KnowledgePoint]) -> [KnowledgePoint] {
         var seen = Set<String>()
         var unique: [KnowledgePoint] = []
@@ -349,14 +384,28 @@ struct OpenAIAnalysisService: AIAnalysisServicing {
         - vocabulary.part_of_speech：写词性，例如 疑问副词、动词、形容词、名词。
 
         - grammar_points.point：必须是具体语法形式，例如 -에、-도、-아/어?、(으)면。
-        - grammar_points.category：必须从以下集合中选择：助词、词尾、连接语法、句型、语气/口语表达。
+        - grammar_points.category：必须从以下集合中选择：助词、词尾、连接语法、句型。
         - grammar_points.meaning_zh：只能写抽象语法义，不能写上下文翻译。
         - grammar_points.surface_form：写原句实际片段。
         - grammar_points.usage_context：解释该语法在原句中的作用，可以写具体翻译。
 
         语法规则：
         - 不要把动词活用形误放进 grammar_points，例如 가(来自 가다) 应优先作为 vocabulary。
+        - grammar_points 只提取有明确学习价值的具体语法形式，不要为了凑数量提取低价值项。
+        - 不要单独提取以下内容作为 grammar_points：
+          1) 单独标点或语气符号：~~、~、..、!!、??
+          2) 单独笑声/语气字符：ㅋㅋ、ㅎㅎ、ㅠㅠ、ㅜㅜ
+          3) 中文类别名：语气助词、疑问词、动词、助词、词尾
+          4) 只有语气效果但没有具体韩语语法形式的项目
+        - 上述内容可放在 tone_labels 或 usage_context 说明，但不要生成 grammar point 卡片。
+        - 若一句话里没有值得学习的具体语法点，grammar_points 可以为空数组。
+        - “句尾”只指有实际语法功能的词尾，例如 -자、-겠-, -아/어도 되다、-(으)면、-ㄹ게、-는데。
         - 每条最多 3 个语法点。
+
+        词类归属规则：
+        - 언제、뭐、왜、어디、누구、어떻게 这类疑问词/疑问副词，应放入 vocabulary。
+        - vocabulary.word 必须写具体词条，不能写“疑问词”等类别名。
+        - grammar_points.point 不能写中文类别名，例如“疑问词”“语气助词”“词尾”。
 
         错误示例：
         - point: "-에", meaning_zh: "到家"（错误：把上下文翻译放进 meaning_zh）
@@ -422,7 +471,7 @@ struct OpenAIAnalysisService: AIAnalysisServicing {
                                         "point": ["type": "string"],
                                         "category": [
                                             "type": "string",
-                                            "enum": ["助词", "词尾", "连接语法", "句型", "语气/口语表达"]
+                                            "enum": ["助词", "词尾", "连接语法", "句型"]
                                         ],
                                         "surface_form": ["type": ["string", "null"]],
                                         "meaning_zh": ["type": "string"],
