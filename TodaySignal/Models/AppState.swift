@@ -348,7 +348,11 @@ class AppState {
             let request = AnalysisRequest(bubbles: [bubble], idolSide: bubble.side)
             let retried = try await aiAnalysisService.analyze(request: request)
             guard let first = retried.first else {
-                analysisResults[resultIndex] = makeFailedAnalysisResult(for: bubble, resultID: current.id)
+                analysisResults[resultIndex] = makeFailedAnalysisResult(
+                    for: bubble,
+                    resultID: current.id,
+                    reason: "单条重试未返回可用结果（返回条目与原文不一致）。"
+                )
                 return
             }
 
@@ -365,7 +369,8 @@ class AppState {
             ])[0]
             analysisResults = deduplicateKnowledgePointsGlobally(in: analysisResults)
         } catch {
-            analysisResults[resultIndex] = makeFailedAnalysisResult(for: bubble, resultID: current.id)
+            let reason = analysisFailureReason(from: error)
+            analysisResults[resultIndex] = makeFailedAnalysisResult(for: bubble, resultID: current.id, reason: reason)
         }
     }
 
@@ -413,12 +418,16 @@ class AppState {
 
                 Task { @MainActor in
                     defer { savingKnowledgePointIDs.remove(pointId) }
-                    let card = await createVocabularyCard(from: point, sentence: analysisResults[resultIndex].originalText)
+                    let created = await createVocabularyCard(from: point, sentence: analysisResults[resultIndex].originalText)
+                    let card = created.card
                     vocabularyCards.insert(card, at: 0)
                     persistCards()
                     previewVocabCard = card
                     previewGrammarCard = nil
                     isCardPreviewLoadingExamples = false
+                    if card.exampleSentence.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                        cardPreviewExampleErrorMessage = created.errorMessage ?? "AI 例句暂未生成成功，请点击“重试生成例句”。"
+                    }
                 }
             } else if previousAction == .saved {
                 // Undo: remove the card that was generated from this point
@@ -455,12 +464,16 @@ class AppState {
 
                 Task { @MainActor in
                     defer { savingKnowledgePointIDs.remove(pointId) }
-                    let card = await createGrammarCard(from: point, sentence: analysisResults[resultIndex].originalText)
+                    let created = await createGrammarCard(from: point, sentence: analysisResults[resultIndex].originalText)
+                    let card = created.card
                     grammarCards.insert(card, at: 0)
                     persistCards()
                     previewGrammarCard = card
                     previewVocabCard = nil
                     isCardPreviewLoadingExamples = false
+                    if card.exampleSentences.isEmpty {
+                        cardPreviewExampleErrorMessage = created.errorMessage ?? "AI 例句暂未生成成功，请点击“重试生成例句”。"
+                    }
                 }
             } else if previousAction == .saved {
                 // Undo: remove the card that was generated from this point
@@ -546,16 +559,25 @@ class AppState {
             resultsByBubbleID[result.bubbleID] = result
         }
 
+        let total = idolBubbles.count
+        let success = resultsByBubbleID.count
+        let failureReason = mergeFailureReason(total: total, success: success)
+
         return idolBubbles.map { bubble in
             if let found = resultsByBubbleID[bubble.id] {
                 return found
             }
-            return makeFailedAnalysisResult(for: bubble)
+            return makeFailedAnalysisResult(for: bubble, reason: failureReason)
         }
     }
 
-    private func makeFailedAnalysisResult(for bubble: ChatBubble, resultID: UUID = UUID()) -> AnalysisResult {
-        AnalysisResult(
+    private func makeFailedAnalysisResult(for bubble: ChatBubble, resultID: UUID = UUID(), reason: String? = nil) -> AnalysisResult {
+        let base = "该条消息解析失败，可单独重试。"
+        let combinedMessage: String = {
+            guard let reason, !reason.isEmpty else { return base }
+            return "\(base)\n\n原因：\(reason)"
+        }()
+        return AnalysisResult(
             id: resultID,
             bubbleID: bubble.id,
             originalText: bubble.text,
@@ -563,27 +585,63 @@ class AppState {
             toneLabels: [],
             vocabulary: [],
             grammarPoints: [],
-            failureMessage: "该条消息解析失败，可单独重试。"
+            failureMessage: combinedMessage
         )
     }
 
+    private func mergeFailureReason(total: Int, success: Int) -> String? {
+        guard total > 0 else { return nil }
+        guard success < total else { return nil }
+        if success == 0 {
+            return "未拿到可用解析结果，常见于模型返回结构不匹配或服务波动。"
+        }
+        return "仅 \(success)/\(total) 条返回可用结果，其余条目返回结构不匹配。"
+    }
+
+    private func analysisFailureReason(from error: Error) -> String {
+        if let aiError = error as? AIAnalysisError {
+            if let debug = aiError.debugMessage, !debug.isEmpty {
+                return debug
+            }
+            switch aiError {
+            case .unauthorized:
+                return "鉴权失败（API Key 无效或权限不足）。"
+            case .rateLimited:
+                return "请求限流或额度不足。"
+            case .serverError, .serviceUnavailable:
+                return "服务暂时不可用或网络异常。"
+            case .invalidResponse:
+                return "返回结构不匹配，无法映射到对应消息。"
+            case .timeout:
+                return "请求超时。"
+            case .missingAPIKey:
+                return "未配置 API Key。"
+            case .emptyInput:
+                return "输入为空，未找到可解析文本。"
+            }
+        }
+        return "网络或服务异常。"
+    }
+
     /// Create a VocabularyCard from a KnowledgePoint
-    private func createVocabularyCard(from point: KnowledgePoint, sentence: String) async -> VocabularyCard {
+    private func createVocabularyCard(from point: KnowledgePoint, sentence: String) async -> (card: VocabularyCard, errorMessage: String?) {
         let example: (ko: String, zh: String)
+        var errorMessage: String?
         do {
             example = try await cardExampleService.vocabularyExample(term: point.term, originalSentence: sentence)
         } catch {
             #if DEBUG
             DebugTelemetry.increment(.cardExampleFallbackTotal)
             #endif
+            errorMessage = cardExampleFailureMessage(from: error)
             if let canned = MockData.vocabularyCards.first(where: { $0.word == point.term }) {
                 example = (canned.exampleSentence, canned.exampleTranslationZH)
             } else {
-                example = (sentence, "包含「\(point.term)」的例句。")
+                example = ("", "")
             }
         }
 
-        return VocabularyCard(
+        let card = VocabularyCard(
             word: point.term,
             meaningZH: point.meaningZH,
             pronunciation: point.pronunciation ?? "",
@@ -594,25 +652,28 @@ class AppState {
             usageNote: point.usageNote,
             sourcePointId: point.id
         )
+        return (card, errorMessage)
     }
 
     /// Create a GrammarCard from a KnowledgePoint
-    private func createGrammarCard(from point: KnowledgePoint, sentence: String) async -> GrammarCard {
+    private func createGrammarCard(from point: KnowledgePoint, sentence: String) async -> (card: GrammarCard, errorMessage: String?) {
         let examples: [(ko: String, zh: String)]
+        var errorMessage: String?
         do {
             examples = try await cardExampleService.grammarExamples(point: point.term, originalSentence: sentence)
         } catch {
             #if DEBUG
             DebugTelemetry.increment(.cardExampleFallbackTotal)
             #endif
+            errorMessage = cardExampleFailureMessage(from: error)
             if let canned = MockData.grammarCards.first(where: { $0.point == point.term }) {
                 examples = canned.exampleSentences
             } else {
-                examples = [(sentence, "包含「\(point.term)」的例句。")]
+                examples = []
             }
         }
 
-        return GrammarCard(
+        let card = GrammarCard(
             point: point.term,
             meaningZH: point.meaningZH,
             toneNote: point.toneNote ?? "",
@@ -621,6 +682,7 @@ class AppState {
             usageContext: point.usageNote,
             sourcePointId: point.id
         )
+        return (card, errorMessage)
     }
 
 
@@ -745,7 +807,7 @@ class AppState {
                 #if DEBUG
                 DebugTelemetry.increment(.cardExampleFallbackTotal)
                 #endif
-                cardPreviewExampleErrorMessage = "例句重试失败，请稍后再试。"
+                cardPreviewExampleErrorMessage = cardExampleFailureMessage(from: error)
             }
             return
         }
@@ -775,9 +837,33 @@ class AppState {
                 #if DEBUG
                 DebugTelemetry.increment(.cardExampleFallbackTotal)
                 #endif
-                cardPreviewExampleErrorMessage = "例句重试失败，请稍后再试。"
+                cardPreviewExampleErrorMessage = cardExampleFailureMessage(from: error)
             }
         }
+    }
+
+    private func cardExampleFailureMessage(from error: Error) -> String {
+        if let cardError = error as? CardExampleError {
+            let base = cardError.errorDescription ?? "例句生成失败，请稍后再试。"
+            switch cardError {
+            case .invalidResponse(let message):
+                if let message, !message.isEmpty {
+                    return "\(base)\n\n原因：\(message)"
+                }
+                return base
+            case .serviceUnavailable(let message),
+                 .unauthorized(let message),
+                 .rateLimited(let message),
+                 .serverError(let message):
+                if let message, !message.isEmpty {
+                    return "\(base)\n\n原因：\(message)"
+                }
+                return base
+            default:
+                return base
+            }
+        }
+        return "例句生成失败，请稍后再试。"
     }
 
     private func globalPointDedupKey(for point: KnowledgePoint) -> String {

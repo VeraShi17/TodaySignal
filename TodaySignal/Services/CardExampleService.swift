@@ -67,16 +67,45 @@ struct OpenAICardExampleService: CardExampleServicing {
     }
 
     func vocabularyExample(term: String, originalSentence: String) async throws -> (ko: String, zh: String) {
-        let prompt = """
-        target_word:
-        \(term)
+        do {
+            return try await vocabularyExampleOnce(
+                term: term,
+                originalSentence: originalSentence,
+                isRepairAttempt: false
+            )
+        } catch {
+            logger.error("Vocabulary example first attempt failed, retry with repair prompt.")
+            return try await vocabularyExampleOnce(
+                term: term,
+                originalSentence: originalSentence,
+                isRepairAttempt: true
+            )
+        }
+    }
 
-        source_sentence:
-        \(originalSentence)
+    func grammarExamples(point: String, originalSentence: String) async throws -> [(ko: String, zh: String)] {
+        do {
+            return try await grammarExamplesOnce(
+                point: point,
+                originalSentence: originalSentence,
+                isRepairAttempt: false
+            )
+        } catch {
+            logger.error("Grammar example first attempt failed, retry with repair prompt.")
+            return try await grammarExamplesOnce(
+                point: point,
+                originalSentence: originalSentence,
+                isRepairAttempt: true
+            )
+        }
+    }
 
-        task:
-        请生成新的例句，不要直接复制 source_sentence。
-        """
+    private func vocabularyExampleOnce(
+        term: String,
+        originalSentence: String,
+        isRepairAttempt: Bool
+    ) async throws -> (ko: String, zh: String) {
+        let prompt = buildVocabularyUserPrompt(term: term, originalSentence: originalSentence, isRepairAttempt: isRepairAttempt)
         let payload = buildPayload(
             systemPrompt: vocabularySystemPrompt,
             userPrompt: prompt,
@@ -89,23 +118,20 @@ struct OpenAICardExampleService: CardExampleServicing {
         let item = try JSONDecoder().decode(OpenAIVocabExampleEnvelope.self, from: Data(parsed.utf8))
         let ko = item.exampleKo.trimmingCharacters(in: .whitespacesAndNewlines)
         let zh = item.exampleZh.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !ko.isEmpty, !zh.isEmpty, containsHangul(ko), ko.count <= 120, zh.count <= 120 else {
-            throw CardExampleError.invalidResponse(message: "Invalid vocabulary example payload")
+
+        if let reason = validateVocabExample(ko: ko, zh: zh, originalSentence: originalSentence) {
+            logger.error("Vocabulary example validation failed. reason=\(reason.rawValue, privacy: .public)")
+            throw CardExampleError.invalidResponse(message: "Invalid vocabulary example payload: \(reason.rawValue)")
         }
         return (ko, zh)
     }
 
-    func grammarExamples(point: String, originalSentence: String) async throws -> [(ko: String, zh: String)] {
-        let prompt = """
-        target_grammar:
-        \(point)
-
-        source_sentence:
-        \(originalSentence)
-
-        task:
-        请生成 1-2 条新的例句，每条例句都要体现 target_grammar。
-        """
+    private func grammarExamplesOnce(
+        point: String,
+        originalSentence: String,
+        isRepairAttempt: Bool
+    ) async throws -> [(ko: String, zh: String)] {
+        let prompt = buildGrammarUserPrompt(point: point, originalSentence: originalSentence, isRepairAttempt: isRepairAttempt)
         let payload = buildPayload(
             systemPrompt: grammarSystemPrompt,
             userPrompt: prompt,
@@ -119,19 +145,84 @@ struct OpenAICardExampleService: CardExampleServicing {
 
         let examples = item.items.map {
             ($0.exampleKo.trimmingCharacters(in: .whitespacesAndNewlines), $0.exampleZh.trimmingCharacters(in: .whitespacesAndNewlines))
-        }.filter { !$0.0.isEmpty && !$0.1.isEmpty }
+        }
 
         guard !examples.isEmpty, examples.count <= 2 else {
             throw CardExampleError.invalidResponse(message: "Invalid grammar examples count")
         }
 
         for example in examples {
-            guard containsHangul(example.0), example.0.count <= 120, example.1.count <= 120 else {
-                throw CardExampleError.invalidResponse(message: "Invalid grammar example item")
+            if let reason = validateVocabExample(ko: example.0, zh: example.1, originalSentence: originalSentence) {
+                logger.error("Grammar example validation failed. reason=\(reason.rawValue, privacy: .public)")
+                throw CardExampleError.invalidResponse(message: "Invalid grammar example item: \(reason.rawValue)")
             }
         }
 
         return examples
+    }
+
+    private func buildVocabularyUserPrompt(term: String, originalSentence: String, isRepairAttempt: Bool) -> String {
+        if isRepairAttempt {
+            return """
+            上一次输出未通过校验。请重新生成。
+
+            target_word:
+            \(term)
+
+            source_sentence:
+            \(originalSentence)
+
+            硬性要求：
+            - example_ko 必须是自然韩语句子。
+            - example_zh 必须是简体中文翻译，不能包含韩文。
+            - example_ko 不能直接复制 source_sentence。
+            - example_zh 不能重复韩语原文，也不能写“包含某词的例句”。
+            - 只输出 JSON。
+            """
+        }
+
+        return """
+        target_word:
+        \(term)
+
+        source_sentence:
+        \(originalSentence)
+
+        task:
+        请生成新的例句，不要直接复制 source_sentence。
+        """
+    }
+
+    private func buildGrammarUserPrompt(point: String, originalSentence: String, isRepairAttempt: Bool) -> String {
+        if isRepairAttempt {
+            return """
+            上一次输出未通过校验。请重新生成。
+
+            target_grammar:
+            \(point)
+
+            source_sentence:
+            \(originalSentence)
+
+            硬性要求：
+            - example_ko 必须是自然韩语句子，并体现 target_grammar。
+            - example_zh 必须是简体中文翻译，不能包含韩文。
+            - example_ko 不能直接复制 source_sentence。
+            - example_zh 不能重复韩语原文，也不能写“包含某词的例句”。
+            - 返回 1-2 条，且只输出 JSON。
+            """
+        }
+
+        return """
+        target_grammar:
+        \(point)
+
+        source_sentence:
+        \(originalSentence)
+
+        task:
+        请生成 1-2 条新的例句，每条例句都要体现 target_grammar。
+        """
     }
 
     private func request(payload: [String: Any]) async throws -> String {
@@ -205,7 +296,7 @@ struct OpenAICardExampleService: CardExampleServicing {
         2) 例句要简短自然，像真实聊天或日常口语，适合初中级学习者。
         3) 尽量贴近原句语境，但不要复制原句；需要生成新的例句。
         4) 不要生成太书面、太复杂、太长的句子。
-        5) 中文意思要准确、口语化。
+        5) example_zh 必须是简体中文翻译，不能包含韩文原文，不能写“包含某词的例句”这类说明句。
         6) 只输出 JSON，不要输出额外文本。
         """
     }
@@ -221,7 +312,7 @@ struct OpenAICardExampleService: CardExampleServicing {
         3) 例句要简短自然，优先日常聊天口语，适合初中级学习者。
         4) 尽量贴近原句语境，但不要直接复制原句。
         5) 不要使用过难词汇或复杂长句。
-        6) 中文意思要准确、口语化。
+        6) example_zh 必须是简体中文翻译，不能包含韩文原文，不能写“包含某词的例句”这类说明句。
         7) 只输出 JSON，不要输出额外文本。
         """
     }
@@ -298,6 +389,57 @@ struct OpenAICardExampleService: CardExampleServicing {
         }
         return false
     }
+
+    private func containsCJK(_ text: String) -> Bool {
+        for scalar in text.unicodeScalars {
+            if (0x4E00...0x9FFF).contains(scalar.value) || (0x3400...0x4DBF).contains(scalar.value) {
+                return true
+            }
+        }
+        return false
+    }
+
+    private func looksCopiedFromSource(_ example: String, source: String) -> Bool {
+        let normalizedExample = normalizeForCompare(example)
+        let normalizedSource = normalizeForCompare(source)
+        guard !normalizedExample.isEmpty, !normalizedSource.isEmpty else { return false }
+        return normalizedExample == normalizedSource
+    }
+
+    private func normalizeForCompare(_ text: String) -> String {
+        text
+            .replacingOccurrences(of: "\\s+", with: "", options: .regularExpression)
+            .lowercased()
+    }
+
+    private func looksEquivalent(_ lhs: String, _ rhs: String) -> Bool {
+        let normalizedLHS = normalizeForCompare(lhs)
+        let normalizedRHS = normalizeForCompare(rhs)
+        return normalizedLHS == normalizedRHS
+    }
+
+    private func validateVocabExample(ko: String, zh: String, originalSentence: String) -> ExampleValidationFailure? {
+        if ko.isEmpty { return .emptyKo }
+        if zh.isEmpty { return .emptyZh }
+        if !containsHangul(ko) { return .koMissingHangul }
+        if !containsCJK(zh) { return .zhMissingChinese }
+        if containsHangul(zh) { return .zhContainsHangul }
+        if looksEquivalent(ko, zh) { return .koEqualsZh }
+        if ko.count > 120 || zh.count > 120 { return .tooLong }
+        if originalSentence.count > 12 && looksCopiedFromSource(ko, source: originalSentence) { return .koCopiedSource }
+        return nil
+    }
+}
+
+private enum ExampleValidationFailure: String {
+    case emptyKo = "empty_ko"
+    case emptyZh = "empty_zh"
+    case koMissingHangul = "ko_missing_hangul"
+    case zhMissingChinese = "zh_missing_chinese"
+    case zhContainsHangul = "zh_contains_hangul"
+    case koEqualsZh = "ko_equals_zh"
+    case koCopiedSource = "ko_copied_source"
+    case tooLong = "too_long"
 }
 
 struct CardExampleServiceFactory {
