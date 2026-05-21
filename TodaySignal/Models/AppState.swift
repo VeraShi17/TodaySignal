@@ -420,12 +420,18 @@ class AppState {
                     defer { savingKnowledgePointIDs.remove(pointId) }
                     let created = await createVocabularyCard(from: point, sentence: analysisResults[resultIndex].originalText)
                     let card = created.card
-                    vocabularyCards.insert(card, at: 0)
-                    persistCards()
-                    previewVocabCard = card
+                    let finalCard: VocabularyCard
+                    if let existing = existingVocabularyCard(for: point.term) {
+                        finalCard = existing
+                    } else {
+                        vocabularyCards.insert(card, at: 0)
+                        persistCards()
+                        finalCard = card
+                    }
+                    previewVocabCard = finalCard
                     previewGrammarCard = nil
                     isCardPreviewLoadingExamples = false
-                    if card.exampleSentence.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                    if finalCard.exampleSentence.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
                         cardPreviewExampleErrorMessage = created.errorMessage ?? "AI 例句暂未生成成功，请点击“重试生成例句”。"
                     }
                 }
@@ -466,12 +472,18 @@ class AppState {
                     defer { savingKnowledgePointIDs.remove(pointId) }
                     let created = await createGrammarCard(from: point, sentence: analysisResults[resultIndex].originalText)
                     let card = created.card
-                    grammarCards.insert(card, at: 0)
-                    persistCards()
-                    previewGrammarCard = card
+                    let finalCard: GrammarCard
+                    if let existing = existingGrammarCard(for: point.term) {
+                        finalCard = existing
+                    } else {
+                        grammarCards.insert(card, at: 0)
+                        persistCards()
+                        finalCard = card
+                    }
+                    previewGrammarCard = finalCard
                     previewVocabCard = nil
                     isCardPreviewLoadingExamples = false
-                    if card.exampleSentences.isEmpty {
+                    if finalCard.exampleSentences.isEmpty {
                         cardPreviewExampleErrorMessage = created.errorMessage ?? "AI 例句暂未生成成功，请点击“重试生成例句”。"
                     }
                 }
@@ -715,7 +727,7 @@ class AppState {
             updated.vocabulary = result.vocabulary.map { point in
                 var p = point
                 let key = knowledgeMarkKey(for: p)
-                if let persistedAction = persistedKnowledgeMarks[key], persistedAction != .saved {
+                if let persistedAction = persistedKnowledgeMarks[key] {
                     p.action = persistedAction
                 }
                 return p
@@ -724,7 +736,7 @@ class AppState {
             updated.grammarPoints = result.grammarPoints.map { point in
                 var p = point
                 let key = knowledgeMarkKey(for: p)
-                if let persistedAction = persistedKnowledgeMarks[key], persistedAction != .saved {
+                if let persistedAction = persistedKnowledgeMarks[key] {
                     p.action = persistedAction
                 }
                 return p
@@ -870,6 +882,20 @@ class AppState {
         let normalizedTerm = point.term.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
         let normalizedMeaning = point.meaningZH.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
         return "\(point.type.rawValue)|\(normalizedTerm)|\(normalizedMeaning)"
+    }
+
+    private func existingVocabularyCard(for term: String) -> VocabularyCard? {
+        let normalized = term.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+        return vocabularyCards.first {
+            $0.word.trimmingCharacters(in: .whitespacesAndNewlines).lowercased() == normalized
+        }
+    }
+
+    private func existingGrammarCard(for term: String) -> GrammarCard? {
+        let normalized = term.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+        return grammarCards.first {
+            $0.point.trimmingCharacters(in: .whitespacesAndNewlines).lowercased() == normalized
+        }
     }
 
     #if DEBUG

@@ -180,12 +180,16 @@ struct OpenAIAnalysisService: AIAnalysisServicing {
                             )
                         }
 
+                    let convertedVocabPoints = item.grammarPoints.compactMap { grammar in
+                        convertMisclassifiedGrammarToVocabulary(grammar)
+                    }
+
                     let grammarPoints = item.grammarPoints
                         .filter { !shouldDropGrammarPoint($0) }
                         .map {
                         KnowledgePoint(
                             type: .grammar,
-                            term: $0.point.trimmingCharacters(in: .whitespacesAndNewlines),
+                            term: normalizeGrammarPointTerm($0.point),
                             meaningZH: normalizeGrammarMeaning(point: $0.point, meaning: $0.meaningZH),
                             toneNote: $0.toneNote,
                             usageNote: buildGrammarUsageContext(surfaceForm: $0.surfaceForm, usageContext: $0.usageContext, category: $0.category)
@@ -197,7 +201,7 @@ struct OpenAIAnalysisService: AIAnalysisServicing {
                         originalText: item.originalText,
                         translationZH: item.translationZH,
                         toneLabels: mapToneLabels(item.toneLabels),
-                        vocabulary: deduplicatedKnowledgePoints(vocabPoints),
+                        vocabulary: deduplicatedKnowledgePoints(vocabPoints + convertedVocabPoints),
                         grammarPoints: deduplicatedKnowledgePoints(grammarPoints)
                     )
                 }
@@ -272,9 +276,14 @@ struct OpenAIAnalysisService: AIAnalysisServicing {
     private func shouldDropVocabularyAsGrammarLike(_ word: String) -> Bool {
         let normalized = word.trimmingCharacters(in: .whitespacesAndNewlines)
         let grammarLikeVocabulary: Set<String> = [
-            "에", "은", "는", "이", "가", "을", "를", "도", "만", "에서", "으로", "하고"
+            "에", "은", "는", "이", "가", "을", "를", "도", "만", "에서", "으로", "하고",
+            "-아지", "-어지", "-야지", "-아야지", "-어야지", "-아/어야지",
+            "-ㄹ게", "-을게", "-는데", "-거든", "-잖아"
         ]
-        return grammarLikeVocabulary.contains(normalized)
+        if grammarLikeVocabulary.contains(normalized) {
+            return true
+        }
+        return normalized.hasPrefix("-")
     }
 
     private func shouldDropGrammarPoint(_ item: OpenAIGrammarItem) -> Bool {
@@ -305,9 +314,59 @@ struct OpenAIAnalysisService: AIAnalysisServicing {
 
         let hasHangul = point.range(of: #"[가-힣ㄱ-ㅎㅏ-ㅣ]"#, options: .regularExpression) != nil
         let looksLikeGrammarNotation = point.contains("-") || point.contains("(") || point.contains("/")
+        if isLikelyContentWordMisclassifiedAsGrammar(point: point) {
+            return true
+        }
         if !hasHangul && !looksLikeGrammarNotation { return true }
 
         return false
+    }
+
+    private func isLikelyContentWordMisclassifiedAsGrammar(point: String) -> Bool {
+        let knownContentLikeWords: Set<String> = [
+            "앞으로", "자주", "언제", "뭐", "왜", "어디", "누구", "어떻게",
+            "진짜", "너무", "많이", "조금", "한번", "오늘", "내일"
+        ]
+        return knownContentLikeWords.contains(point)
+    }
+
+    private func convertMisclassifiedGrammarToVocabulary(_ item: OpenAIGrammarItem) -> KnowledgePoint? {
+        let point = item.point.trimmingCharacters(in: .whitespacesAndNewlines)
+        let mapping: [String: (meaning: String, partOfSpeech: String)] = [
+            "앞으로": ("以后；今后；向前", "副词"),
+            "자주": ("经常", "频率副词"),
+            "언제": ("什么时候", "疑问副词"),
+            "뭐": ("什么", "代词/疑问词"),
+            "왜": ("为什么", "疑问副词"),
+            "어디": ("哪里", "疑问代词/副词"),
+            "어떻게": ("怎么；如何", "疑问副词")
+        ]
+
+        guard let mapped = mapping[point] else { return nil }
+        return KnowledgePoint(
+            type: .vocabulary,
+            term: point,
+            meaningZH: mapped.meaning,
+            pronunciation: nil,
+            partOfSpeech: mapped.partOfSpeech,
+            usageNote: buildVocabularyUsageNote(surfaceForm: item.surfaceForm, usageNote: item.usageContext)
+        )
+    }
+
+    private func normalizeGrammarPointTerm(_ point: String) -> String {
+        let trimmed = point.trimmingCharacters(in: .whitespacesAndNewlines)
+        let normalizedNoSpace = trimmed.replacingOccurrences(of: " ", with: "")
+
+        let shouldNormalizeToAyaoji = normalizedNoSpace == "-야지" ||
+            normalizedNoSpace == "-아지" ||
+            normalizedNoSpace == "-어지" ||
+            normalizedNoSpace == "-아야지" ||
+            normalizedNoSpace == "-어야지"
+
+        if shouldNormalizeToAyaoji {
+            return "-아/어야지"
+        }
+        return trimmed
     }
 
     private func deduplicatedKnowledgePoints(_ points: [KnowledgePoint]) -> [KnowledgePoint] {

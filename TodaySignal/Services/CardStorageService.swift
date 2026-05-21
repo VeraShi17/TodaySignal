@@ -218,12 +218,12 @@ struct CardStorageService {
             ))
 
             if let existing = matches.first {
-                if action == .open || action == .saved {
+                if action == .open {
                     context.delete(existing)
                 } else {
                     existing.actionRawValue = action.rawValue
                 }
-            } else if action == .known || action == .dismissed {
+            } else if action == .known || action == .dismissed || action == .saved {
                 context.insert(PersistedKnowledgeMark(key: key, actionRawValue: action.rawValue))
             }
 
