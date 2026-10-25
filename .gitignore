@@ -18,6 +18,9 @@ build/
 .env.*
 *.secret
 
+# Keep the source recording local; the README links to the optimized MP4.
+todaysignal-demo.MOV
+
 # Fastlane (if added later)
 fastlane/report.xml
 fastlane/Preview.html
