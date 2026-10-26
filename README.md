@@ -1,10 +1,10 @@
 # Today's Signal · 오늘의 시그널
 
-**A Chinese-language iOS app for learning Korean from real chat context.** Upload a screenshot or paste text, review the recognized messages, explore vocabulary, grammar and tone, then save useful expressions as study cards.
+**A Chinese-language iOS app designed primarily for learning from Korean idol messages on Weverse DM.** Beyond sentence-level translation, it explains conversational tone, grammar and vocabulary, and turns useful expressions into study cards. Users can import a screenshot or paste text and review the recognized chat bubbles before analysis.
 
 [English](README.md) · [简体中文](README.zh-CN.md)
 
-> **Status:** Personal-use MVP. The app has not been released on the App Store. Its interface is in Chinese; the English documentation is for readers evaluating the project. The current Xcode target requires iOS 26.2 or later.
+> **Status:** Independent MVP, not released on the App Store. Its interface is in Chinese; the English documentation is for readers evaluating the project. The current Xcode target requires iOS 26.2 or later.
 
 ## Demo
 
